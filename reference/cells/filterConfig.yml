@@ -1,0 +1,16 @@
+apiRules:
+  # 1) Include Aspose.Cells.LowCode (and all types under that namespace)
+  - include:
+      uidRegex: '^(?:T:)?Aspose\.Cells\.LowCode(?:$|\..+)'
+
+  # 2) Include the four top-level classes in Aspose.Cells
+  - include:
+      uidRegex: '^(?:T:)?Aspose\.Cells\.(?:ProtectionType|SaveFormat|HtmlSaveOptions|PdfSaveOptions|Metered)(?:$|\..+)'
+
+  # 3) Include the Rendering.ImageOrPrintOptions class
+  - include:
+      uidRegex: '^(?:T:)?Aspose\.Cells\.Rendering\.ImageOrPrintOptions(?:$|\..+)'
+
+  # 4) Exclude everything else
+  - exclude:
+      uidRegex: '.*'
