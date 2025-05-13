@@ -20,11 +20,6 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo rm -rf /home/runner/runners/*/_diag/* || true
 
-      # 2) Purge the big pre-installed toolcache (~8–12 GB)
-      - name: Clean up hosted toolcache
-        if: runner.os == 'Linux'
-        run: sudo rm -rf /opt/hostedtoolcache/* || true
-
       # 3) Sparse-checkout only the folders you need + HEAD only
       - name: Checkout only needed folders
         uses: actions/checkout@v4
