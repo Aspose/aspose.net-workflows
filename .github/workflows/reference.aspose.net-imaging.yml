@@ -20,7 +20,12 @@ jobs:
       - name: Check disk usage (before)
         run: df -h
 
-      # 2) Shallow-clone only the latest commit (fetch-depth: 1) instead of the full history
+      # 2) Purge the big pre-installed toolcache (reclaims ~8–12 GB)
+      - name: Clean up hosted toolcache
+        if: runner.os == 'Linux'
+        run: sudo rm -rf /opt/hostedtoolcache/*
+
+      # 3) Shallow clone only HEAD
       - name: Checkout Aspose.NET (shallow)
         uses: actions/checkout@v3
         with:
@@ -28,20 +33,20 @@ jobs:
           token: ${{ secrets.REPO_TOKEN }}
           fetch-depth: 1
 
-      # 3) Prune any Docker cruft and temp files to reclaim space
+      # 4) Prune Docker images & temp files
       - name: Clean up Docker & temp files
         if: runner.os == 'Linux'
         run: |
           docker system prune -af || true
-          sudo rm -rf /tmp/* || true
+          sudo rm -rf /tmp/*
 
-      # 4) Install Hugo
+      # 5) Install Hugo
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v3
         with:
           hugo-version: '0.136.0'
 
-      # 5) Compute the base URL based on the chosen environment
+      # 6) Compute the base URL based on the chosen environment
       - name: Determine Base URL
         id: base-url
         run: |
@@ -51,22 +56,19 @@ jobs:
             echo "url=https://reference-qa.aspose.net/imaging" >> $GITHUB_OUTPUT
           fi
 
-      # 6) Build the site
+      # 7) Build the site – quiet mode + no GitInfo/metrics to cut log size
       - name: Build Aspose.Imaging
         run: |
-          hugo \
+          hugo --quiet \
             --config "./configs/reference.aspose.net/imaging.toml" \
             -b "${{ steps.base-url.outputs.url }}" \
             --cleanDestinationDir \
-            --minify \
-            --templateMetrics \
-            --templateMetricsHints \
-            --enableGitInfo
+            --minify
 
-      # 7) Deploy to S3
+      # 8) Deploy to S3 in quiet mode
       - name: Deploy Aspose.Imaging to S3
         run: |
-          hugo deploy \
+          hugo deploy --quiet \
             --config "configs/reference.aspose.net/imaging.toml" \
             --maxDeletes=-1 \
             --target "${{ github.event.inputs.environment }}" \
@@ -75,6 +77,6 @@ jobs:
           AWS_ACCESS_KEY_ID:     ${{ secrets.ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
 
-      # 8) Check free space again to verify cleanup
+      # 9) Check free space again to verify cleanup
       - name: Check disk usage (after)
         run: df -h
