@@ -16,24 +16,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) See how much free space we start with
+      # 1) See starting disk usage
       - name: Check disk usage (before)
         run: df -h
 
-      # 2) Purge the big pre-installed toolcache (reclaims ~8–12 GB)
+      # 2) Purge the big pre-installed toolcache (~8–12 GB)
       - name: Clean up hosted toolcache
         if: runner.os == 'Linux'
         run: sudo rm -rf /opt/hostedtoolcache/*
 
-      # 3) Shallow clone only HEAD
-      - name: Checkout Aspose.NET (shallow)
+      # 3) Sparse-checkout only the folders you need + HEAD only
+      - name: Checkout only needed folders
         uses: actions/checkout@v3
         with:
           repository: Aspose/aspose.net
           token: ${{ secrets.REPO_TOKEN }}
           fetch-depth: 1
+          sparse-checkout: |
+            archtypes
+            assets
+            configs
+            content/reference.aspose.net/imaging
+            data
+            layouts
+            themes/docs
+          sparse-checkout-cone-mode: false
 
-      # 4) Prune Docker images & temp files
+      # 4) Prune Docker & clear /tmp
       - name: Clean up Docker & temp files
         if: runner.os == 'Linux'
         run: |
@@ -46,7 +55,7 @@ jobs:
         with:
           hugo-version: '0.136.0'
 
-      # 6) Compute the base URL based on the chosen environment
+      # 6) Compute base URL based on environment
       - name: Determine Base URL
         id: base-url
         run: |
@@ -56,7 +65,7 @@ jobs:
             echo "url=https://reference-qa.aspose.net/imaging" >> $GITHUB_OUTPUT
           fi
 
-      # 7) Build the site – quiet mode + no GitInfo/metrics to cut log size
+      # 7) Build the site in quiet mode
       - name: Build Aspose.Imaging
         run: |
           hugo --quiet \
@@ -65,7 +74,7 @@ jobs:
             --cleanDestinationDir \
             --minify
 
-      # 8) Deploy to S3 in quiet mode
+      # 8) Deploy to S3 quietly
       - name: Deploy Aspose.Imaging to S3
         run: |
           hugo deploy --quiet \
@@ -77,6 +86,6 @@ jobs:
           AWS_ACCESS_KEY_ID:     ${{ secrets.ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
 
-      # 9) Check free space again to verify cleanup
+      # 9) See ending disk usage
       - name: Check disk usage (after)
         run: df -h
