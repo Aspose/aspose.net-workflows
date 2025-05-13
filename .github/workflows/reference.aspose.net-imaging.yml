@@ -14,8 +14,12 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
+      # 0) Purge the runner’s own diag logs
+      - name: Clean up runner diagnostic logs
+        if: runner.os == 'Linux'
+        run: sudo rm -rf /home/runner/runners/*/_diag/* || true
+
       # 1) See starting disk usage
       - name: Check disk usage (before)
         run: df -h
@@ -23,22 +27,21 @@ jobs:
       # 2) Purge the big pre-installed toolcache (~8–12 GB)
       - name: Clean up hosted toolcache
         if: runner.os == 'Linux'
-        run: sudo rm -rf /opt/hostedtoolcache/*
+        run: sudo rm -rf /opt/hostedtoolcache/* || true
 
       # 3) Sparse-checkout only the folders you need + HEAD only
       - name: Checkout only needed folders
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: Aspose/aspose.net
           token: ${{ secrets.REPO_TOKEN }}
           fetch-depth: 1
           sparse-checkout: |
-            archtypes
             assets
             configs
             content/reference.aspose.net/imaging
-            data
             layouts
+            static
             themes/docs
           sparse-checkout-cone-mode: false
 
@@ -47,7 +50,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           docker system prune -af || true
-          sudo rm -rf /tmp/*
+          sudo rm -rf /tmp/* || true
 
       # 5) Install Hugo
       - name: Setup Hugo
@@ -65,6 +68,9 @@ jobs:
             echo "url=https://reference-qa.aspose.net/imaging" >> $GITHUB_OUTPUT
           fi
 
+      - name: Check disk usage (before build)
+        run: df -h
+
       # 7) Build the site in quiet mode
       - name: Build Aspose.Imaging
         run: |
@@ -73,6 +79,12 @@ jobs:
             -b "${{ steps.base-url.outputs.url }}" \
             --cleanDestinationDir \
             --minify
+
+      - name: Check Hugo public directory size
+        run: du -sh public
+
+      - name: Check disk usage (after build)
+        run: df -h
 
       # 8) Deploy to S3 quietly
       - name: Deploy Aspose.Imaging to S3
@@ -85,7 +97,3 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
-
-      # 9) See ending disk usage
-      - name: Check disk usage (after)
-        run: df -h
