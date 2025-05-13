@@ -20,10 +20,6 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo rm -rf /home/runner/runners/*/_diag/* || true
 
-      # 1) See starting disk usage
-      - name: Check disk usage (before)
-        run: df -h
-
       # 2) Purge the big pre-installed toolcache (~8–12 GB)
       - name: Clean up hosted toolcache
         if: runner.os == 'Linux'
@@ -68,9 +64,6 @@ jobs:
             echo "url=https://reference-qa.aspose.net/imaging" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check disk usage (before build)
-        run: df -h
-
       # 7) Build the site in quiet mode
       - name: Build Aspose.Imaging
         run: |
@@ -82,9 +75,6 @@ jobs:
 
       - name: Check Hugo public directory size
         run: du -sh public
-
-      - name: Check disk usage (after build)
-        run: df -h
 
       # 8) Deploy to S3 quietly
       - name: Deploy Aspose.Imaging to S3
