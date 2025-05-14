@@ -16,26 +16,21 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      # New: Check disk space at the very beginning
-      - name: Check disk space before anything
-        if: runner.os == 'Linux'
-        run: df -h || true # Use || true to prevent workflow failure if df -h itself fails
-
+      # 1) Immediately wipe the huge hosted toolcache and other SDKs
+      - name: Free up host toolcache & caches
+        run: |
+          sudo rm -rf /opt/hostedtoolcache/* \
+                     /usr/share/dotnet     \
+                     /usr/local/share/dotnet \
+                     /usr/local/lib/android  \
+                     /var/lib/apt/lists/*    \
+                     $RUNNER_TOOL_CACHE      \
+                     $HOME/.cache
       # 0) Purge the runner’s own diag logs
       # Keep this as it directly addresses the directory in the error
       - name: Clean up runner diagnostic logs
         if: runner.os == 'Linux'
         run: sudo rm -rf /home/runner/runners/*/_diag/* || true
-
-      # New: Check disk space after cleaning logs (optional, but helps see if it makes a difference)
-      - name: Check disk space after initial log cleanup
-        if: runner.os == 'Linux'
-        run: df -h || true # Use || true
-
-      # New: Check the size of the _diag directory specifically after cleanup
-      - name: Check size of _diag after cleanup
-        if: runner.os == 'Linux'
-        run: sudo du -sh /home/runner/runners/*/_diag/ || true # Check specific path
 
       # 3) Sparse-checkout only the folders you need + HEAD only
       - name: Checkout only needed folders
@@ -52,33 +47,6 @@ jobs:
             static
             themes/docs
           sparse-checkout-cone-mode: false
-
-      # New: Check disk space after checkout
-      - name: Check disk space after checkout
-        if: runner.os == 'Linux'
-        run: df -h || true # Use || true
-
-      # New: Check the size of the workspace after checkout
-      - name: Check size of workspace after checkout
-        if: runner.os == 'Linux'
-        run: du -sh ${{ github.workspace }} || true # Check the workspace directory
-
-      # New: Check the size of the _diag directory again before the build
-      - name: Check size of _diag before build
-        if: runner.os == 'Linux'
-        run: sudo du -sh /home/runner/runners/*/_diag/ || true # Check again
-
-      # 4) Prune Docker & clear /tmp
-      - name: Clean up Docker & temp files
-        if: runner.os == 'Linux'
-        run: |
-          docker system prune -af || true
-          sudo rm -rf /tmp/* || true
-
-      # New: Check disk space after cleaning Docker and temp
-      - name: Check disk space after Docker and temp cleanup
-        if: runner.os == 'Linux'
-        run: df -h || true # Use || true
 
       # 5) Install Hugo
       - name: Setup Hugo
@@ -106,15 +74,6 @@ jobs:
             --cleanDestinationDir \
             --minify
 
-      # Keep this check to see the size of the public directory (if the build completes)
-      - name: Check Hugo public directory size
-        run: du -sh public || true
-
-      # New: Check disk space after build (if it completes)
-      - name: Check disk space after build
-        if: runner.os == 'Linux'
-        run: df -h || true # Use || true
-
       # 8) Deploy to S3 quietly
       - name: Deploy Aspose.Imaging to S3
         run: |
@@ -126,18 +85,3 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
-
-      # New: Clean up the generated public directory after deployment
-      # Keep this even if the error happens before it, for runs that might succeed later
-      - name: Clean up Hugo public directory
-        run: rm -rf public || true
-
-      # New: Check disk space after cleaning public directory
-      - name: Check disk space after cleaning public
-        if: runner.os == 'Linux'
-        run: df -h || true # Use || true
-
-      # Final disk space check
-      - name: Final disk space check
-        if: runner.os == 'Linux'
-        run: df -h || true # Use || true
