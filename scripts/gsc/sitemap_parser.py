@@ -18,7 +18,7 @@ SUBDOMAINS = [
 FAMILY_SUBDOMAINS = [
     "kb.aspose.net", "docs.aspose.net", "products.aspose.net", "reference.aspose.net"
 ]
-FAMILIES = ['words', 'pdf', 'cells', 'imaging', 'barcode', 'tasks', 'ocr', 'cad', 'html', 'zip', 'page', 'psd', 'tex']
+FAMILIES = ['words', 'pdf', 'cells', 'imaging', 'barcode', 'tasks', 'ocr', 'cad', 'html', 'zip', 'page', 'psd', 'tex', 'svg']
 BATCH_SIZE = 200
 REPROCESS_DAYS_LIMIT = 30  
 

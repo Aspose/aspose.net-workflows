@@ -26,7 +26,7 @@ FAMILY_SUBDOMAINS = [
 ]
 
 # List of families (kept separately)
-FAMILIES = ['words', 'pdf', 'cells', 'imaging', 'barcode', 'tasks', 'ocr', 'cad', 'html', 'zip', 'page', 'psd', 'tex']
+FAMILIES = ['words', 'pdf', 'cells', 'imaging', 'barcode', 'tasks', 'ocr', 'cad', 'html', 'zip', 'page', 'psd', 'tex', 'svg']
 
 
 # Helper function to authenticate Google services
