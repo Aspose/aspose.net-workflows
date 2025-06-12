@@ -79,7 +79,7 @@ jobs:
       - name: Delay before triggering home workflow
         run: |
           echo "Waiting for 30 seconds before triggering the home workflow..."
-          sleep 30
+          sleep 900
         if: hashFiles('home_workflow.txt') != ''
 
       - name: Run the home workflow
