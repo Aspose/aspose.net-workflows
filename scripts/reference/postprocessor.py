@@ -327,7 +327,8 @@ def update_frontmatter(content, layout_value):
 
 # Define a mapping for special cases where the .md filename does not match the expected family name
 FAMILY_NAME_MAPPING = {
-    "Aspose.HTML": "Aspose.Html",  # Example: Aspose.HTML should match Aspose.Html.md
+    "Aspose.HTML": "Aspose.Html",  # Aspose.HTML should match Aspose.Html.md
+    "Aspose.SVG": "Aspose.Svg"
 }
 
 def rename_file():
