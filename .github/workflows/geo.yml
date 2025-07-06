@@ -5,6 +5,7 @@ on:
       subdomains:
         description: "Comma-separated list of subdomains to process"
         required: false
+        # Ensure this default is a comma-separated string, as you intend to split it.
         default: "www.aspose.net,about.aspose.net,products.aspose.net,websites.aspose.net,blog.aspose.net,kb.aspose.net,reference.aspose.net,docs.aspose.net"
       mapping_file:
         description: "Path to mapping.json (relative to checked_out_repo/)"
@@ -26,7 +27,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        subdomain: ${{ fromJson(github.event.inputs.subdomains || '["www.aspose.net","about.aspose.net","products.aspose.net","websites.aspose.net","blog.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]' ) }}
+        # Use `split(',')` to turn the comma-separated string into an array.
+        # The `||` part handles the `schedule` trigger where `github.event.inputs` might be empty.
+        subdomain: ${{ (github.event.inputs.subdomains || 'www.aspose.net,about.aspose.net,products.aspose.net,websites.aspose.net,blog.aspose.net,kb.aspose.net,reference.aspose.net,docs.aspose.net') | split(',') }}
 
     steps:
       - name: Checkout workflow repo (default)
