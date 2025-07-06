@@ -1,33 +1,32 @@
 name: generate-sync-llms-txt
+
 on:
   workflow_dispatch:
     inputs:
       subdomains:
-        description: "Comma-separated list of subdomains to process"
+        description: "JSON array of sub-domains"
         required: false
-        default: "www.aspose.net,about.aspose.net,products.aspose.net,websites.aspose.net,blog.aspose.net,kb.aspose.net,reference.aspose.net,docs.aspose.net"
+        default: '["www.aspose.net","about.aspose.net","products.aspose.net","websites.aspose.net","blog.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]'
       mapping_file:
         description: "Path to mapping.json (relative to checked_out_repo/)"
         required: false
         default: "mapping.json"
       clean_output:
-        description: "Clean subdomain output folders before processing? (true/false)"
+        description: "Clean output folders before processing? (true/false)"
         required: false
         default: "false"
 
   schedule:
-    - cron: "0 2 * * 6" # Every Saturday at 2:00 UTC
+    - cron: "0 2 * * 6"     # every Saturday 02:00 UTC
 
 jobs:
   geo-pipeline:
-    name: GEO Markdown Generation & S3 Push
     runs-on: ubuntu-latest
-
     strategy:
-      fail-fast: false
       matrix:
-        # CORRECTED LINE: Use split() as a function directly on the expression.
-        subdomain: ${{ split(github.event.inputs.subdomains || 'www.aspose.net,about.aspose.net,products.aspose.net,websites.aspose.net,blog.aspose.net,kb.aspose.net,reference.aspose.net,docs.aspose.net', ',') }}
+        subdomain: ${{ fromJson(github.event.inputs.subdomains ||
+          '["www.aspose.net","about.aspose.net","products.aspose.net","websites.aspose.net","blog.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]') }}
+
 
     steps:
       - name: Checkout workflow repo (default)
