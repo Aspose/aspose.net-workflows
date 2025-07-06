@@ -1,0 +1,104 @@
+name: generate-sync-llms-txt
+on:
+  workflow_dispatch:
+    inputs:
+      subdomains:
+        description: "Comma-separated list of subdomains to process"
+        required: false
+        default: "www.aspose.net,about.aspose.net,products.aspose.net,websites.aspose.net,blog.aspose.net,kb.aspose.net,reference.aspose.net,docs.aspose.net"
+      mapping_file:
+        description: "Path to mapping.json (relative to checked_out_repo/)"
+        required: false
+        default: "mapping.json"
+      clean_output:
+        description: "Clean subdomain output folders before processing? (true/false)"
+        required: false
+        default: "false"
+
+  schedule:
+    - cron: "0 2 * * 6" # Every Saturday at 2:00 UTC
+
+env:
+  AWS_REGION: "us-east-1" # Set your region
+
+jobs:
+  geo-pipeline:
+    name: GEO Markdown Generation & S3 Push
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        subdomain: ${{ fromJson(github.event.inputs.subdomains || '["www.aspose.net","about.aspose.net","products.aspose.net","websites.aspose.net","blog.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]' ) }}
+
+    steps:
+      - name: Checkout workflow repo (default)
+        uses: actions/checkout@v4
+
+      - name: Checkout theme repo (Aspose/aspose.net)
+        uses: actions/checkout@v4
+        with:
+          repository: Aspose/aspose.net
+          token: ${{ secrets.REPO_TOKEN }}
+          path: checked_out_repo
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Install AWS CLI v2
+        uses: aws-actions/setup-aws-cli@v3
+
+      - name: Configure AWS credentials (Production S3!)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Generate Markdown for ${{ matrix.subdomain }}
+        id: geo_generate
+        run: |
+          set -e
+          echo "Starting geo.py for subdomain: ${{ matrix.subdomain }}"
+          INPUT_DIR="checked_out_repo/content/"
+          OUTPUT_DIR="checked_out_repo/geo/"
+          MAPPING_FILE="checked_out_repo/${{ github.event.inputs.mapping_file || 'mapping.json' }}"
+          CLEAN_OUTPUT="${{ github.event.inputs.clean_output || 'false' }}"
+          # Clean output if requested
+          if [ "$CLEAN_OUTPUT" = "true" ]; then
+            echo "Cleaning output folder: ${OUTPUT_DIR}${{ matrix.subdomain }}/"
+            rm -rf "${OUTPUT_DIR}${{ matrix.subdomain }}/"
+          fi
+          python3 checked_out_repo/scripts/optimizer/geo.py \
+            --input "$INPUT_DIR" \
+            --output "$OUTPUT_DIR" \
+            --subdomain "${{ matrix.subdomain }}" \
+            --mapping "$MAPPING_FILE"
+
+      - name: Upload ${{ matrix.subdomain }} output to S3 (Production!)
+        id: upload_to_s3
+        run: |
+          set -e
+          OUTPUT_DIR="checked_out_repo/geo/${{ matrix.subdomain }}/"
+          S3_BUCKET="${{ matrix.subdomain }}"
+          # Safety: Only upload if output dir exists and is not empty
+          if [ -d "$OUTPUT_DIR" ] && [ "$(ls -A "$OUTPUT_DIR")" ]; then
+            echo "Uploading $OUTPUT_DIR to s3://$S3_BUCKET/ (recursive, production S3)"
+            aws s3 cp "$OUTPUT_DIR" "s3://$S3_BUCKET/" --recursive --only-show-errors
+          else
+            echo "Output directory $OUTPUT_DIR does not exist or is empty. Nothing to upload for $S3_BUCKET."
+          fi
+
+      - name: Confirm Upload (list S3 bucket top)
+        if: success()
+        run: |
+          echo "Listing contents of s3://${{ matrix.subdomain }}/"
+          aws s3 ls "s3://${{ matrix.subdomain }}/" --recursive | head -n 20
