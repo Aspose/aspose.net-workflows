@@ -26,8 +26,6 @@ jobs:
       matrix:
         subdomain: ${{ fromJson(github.event.inputs.subdomains ||
           '["www.aspose.net","about.aspose.net","products.aspose.net","websites.aspose.net","blog.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]') }}
-
-
     steps:
       - name: Checkout workflow repo (default)
         uses: actions/checkout@v4
@@ -49,9 +47,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml
-
-      - name: Install AWS CLI v2
-        uses: aws-actions/setup-aws-cli@v3
 
       - name: Configure AWS credentials (Production S3!)
         uses: aws-actions/configure-aws-credentials@v4
