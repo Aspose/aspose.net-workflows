@@ -57,7 +57,6 @@ Below is a list of all workflow files located in `.github/workflows/`, each link
 | [reference.aspose.net-barcode.yml](../../actions/workflows/reference.aspose.net-barcode.yml) | Builds and deploys Barcode API reference for reference.aspose.net |
 | [reference.aspose.net-cad.yml](../../actions/workflows/reference.aspose.net-cad.yml) | Builds and deploys CAD API reference for reference.aspose.net |
 | [reference.aspose.net-cells.yml](../../actions/workflows/reference.aspose.net-cells.yml) | Builds and deploys Cells API reference for reference.aspose.net |
-| [reference.aspose.net-generator.yml](../../actions/workflows/reference.aspose.net-generator.yml) | Generates API reference content for reference.aspose.net |
 | [reference.aspose.net-home.yml](../../actions/workflows/reference.aspose.net-home.yml) | Builds and deploys the home page for reference.aspose.net |
 | [reference.aspose.net-html.yml](../../actions/workflows/reference.aspose.net-html.yml) | Builds and deploys HTML API reference for reference.aspose.net |
 | [reference.aspose.net-imaging.yml](../../actions/workflows/reference.aspose.net-imaging.yml) | Builds and deploys Imaging API reference for reference.aspose.net |
@@ -82,3 +81,4 @@ Below is a list of all workflow files located in `.github/workflows/`, each link
 | [query-collector.yml](../../actions/workflows/query-collector.yml) | Collects or aggregates queries from Google Search Console |
 | [query-optimizer.yml](../../actions/workflows/query-optimizer.yml) | Optimizes content based on queries collection from Google Search Console |
 | [sitemap-scheduler.yml](../../actions/workflows/sitemap-scheduler.yml) | Automatically submit sitemaps to Google via Google Search Console API |
+| [reference.aspose.net-generator.yml](../../actions/workflows/reference.aspose.net-generator.yml) | Generates API reference content for reference.aspose.net |
