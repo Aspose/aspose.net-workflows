@@ -1,0 +1,8 @@
+apiRules:
+  # 1. Allow everything in Aspose.Email.LowCode (all classes, interfaces, enums, and their members)
+  - include:
+      uidRegex: "^(?:T:)?Aspose\\.Email\\.LowCode(?:$|\\..+)"
+  
+  # 2. Include Aspose.Email.Metered
+  - include:
+      uidRegex: "^(?:T:)?Aspose\\.Email\\.(Metered)(?:$|\\..+)"
