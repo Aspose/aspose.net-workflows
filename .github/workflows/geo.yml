@@ -94,14 +94,34 @@ jobs:
           # Safety: Only upload if output dir exists and is not empty
           if [ -d "$OUTPUT_DIR" ] && [ "$(ls -A "$OUTPUT_DIR")" ]; then
             echo "Uploading $OUTPUT_DIR to s3://$S3_BUCKET/ (recursive)"
-            aws s3 cp "$OUTPUT_DIR" "s3://$S3_BUCKET/" --recursive --only-show-errors
+            aws s3 sync "$OUTPUT_DIR" "s3://$S3_BUCKET/" --only-show-errors
           else
             echo "Output directory $OUTPUT_DIR does not exist or is empty. Nothing to upload for $S3_BUCKET."
           fi
 
       # ———————————————————————————————————————————————————————  Verify upload
-      - name: Confirm upload (list S3 bucket top)
-        if: success()
+      - name: Verify llms.txt upload time
+        if: success() # Only runs if the previous step was successful.
         run: |
-          echo "Listing contents of s3://${{ matrix.subdomain }}/"
-          aws s3 ls "s3://${{ matrix.subdomain }}/" --recursive | head -n 20
+          set -e
+          SUBDOMAIN="${{ matrix.subdomain }}"
+          FILE_KEY="llms.txt"
+          S3_PATH="s3://${SUBDOMAIN}/${FILE_KEY}"
+          echo "Verifying last modified date for ${S3_PATH}"
+          LAST_MODIFIED_ISO=$(aws s3api head-object --bucket "${SUBDOMAIN}" --key "${FILE_KEY}" --query 'LastModified' --output text 2>/dev/null)
+          if [ -z "$LAST_MODIFIED_ISO" ]; then
+              echo "::error::File ${S3_PATH} not found or no LastModified date available."
+              exit 1
+          fi
+          LAST_MODIFIED_UNIX=$(date -d "$LAST_MODIFIED_ISO" +%s)
+          CURRENT_UNIX=$(date +%s)
+          DIFF_SECONDS=$((CURRENT_UNIX - LAST_MODIFIED_UNIX))
+          echo "Current time (Unix): $CURRENT_UNIX"
+          echo "File last modified (Unix): $LAST_MODIFIED_UNIX (from $LAST_MODIFIED_ISO)"
+          echo "Time difference (seconds): $DIFF_SECONDS"
+          if [ "$DIFF_SECONDS" -lt 60 ] && [ "$DIFF_SECONDS" -ge 0 ]; then
+              echo "✅ Success: ${FILE_KEY} on ${SUBDOMAIN} was modified less than 1 minute ago ($DIFF_SECONDS seconds)."
+          else
+              echo "::error::Failure: ${FILE_KEY} on ${SUBDOMAIN} was modified $DIFF_SECONDS seconds ago, which is not within the last minute."
+              exit 1
+          fi
