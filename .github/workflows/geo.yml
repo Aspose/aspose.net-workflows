@@ -10,7 +10,7 @@ on:
       mapping_file:
         description: "Path to mapping.json (relative to checked_out_repo/)"
         required: false
-        default: "scripts/optimizer/mapping.json"   # <─ default now points to the real location
+        default: "mapping.json"   # <─ default now points to the real location
       clean_output:
         description: "Clean output folders before processing? (true/false)"
         required: false
