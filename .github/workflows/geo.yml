@@ -6,7 +6,7 @@ on:
       subdomains:
         description: "JSON array of sub-domains"
         required: false
-        default: '["www.aspose.net","about.aspose.net","products.aspose.net","websites.aspose.net","blog.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]'
+        default: '["about.aspose.net","products.aspose.net","websites.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]'
       mapping_file:
         description: "Path to mapping.json (relative to checked_out_repo/)"
         required: false
@@ -25,7 +25,7 @@ jobs:
     strategy:
       matrix:
         subdomain: ${{ fromJson(github.event.inputs.subdomains ||
-          '["www.aspose.net","about.aspose.net","products.aspose.net","websites.aspose.net","blog.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]') }}
+          '["about.aspose.net","products.aspose.net","websites.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]') }}
 
     steps:
       # ———————————————————————————————————————————————————————  Checkout
@@ -68,7 +68,7 @@ jobs:
 
           INPUT_DIR="checked_out_repo/content/"
           OUTPUT_DIR="checked_out_repo/geo/"
-          MAPPING_FILE="checked_out_repo/${{ github.event.inputs.mapping_file }}"
+          MAPPING_FILE="checked_out_repo/scripts/optimizer/${{ github.event.inputs.mapping_file }}"
           CLEAN_OUTPUT="${{ github.event.inputs.clean_output }}"
 
           # Clean output if requested
