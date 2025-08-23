@@ -7,28 +7,23 @@ on:
         description: "JSON array of sub-domains"
         required: false
         default: '["about.aspose.net","products.aspose.net","websites.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]'
-      mapping_file:
-        description: "Path to mapping.json (relative to checked_out_repo/)"
-        required: false
-        default: "mapping.json"   # <─ default now points to the real location
       clean_output:
         description: "Clean output folders before processing? (true/false)"
         required: false
         default: "false"
 
   schedule:
-    - cron: "0 2 * * 6"          # every Saturday 02:00 UTC
+    - cron: "0 2 * * 6" # every Saturday 02:00 UTC
 
 jobs:
   geo-pipeline:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        subdomain: ${{ fromJson(github.event.inputs.subdomains ||
-          '["about.aspose.net","products.aspose.net","websites.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]') }}
+        subdomain: ${{ fromJson(github.event.inputs.subdomains || '["about.aspose.net","products.aspose.net","websites.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]') }}
 
     steps:
-      # ———————————————————————————————————————————————————————  Checkout
+      # ———————————————————————————————————————————————————————  Checkout
       - name: Checkout workflow repo (default)
         uses: actions/checkout@v4
 
@@ -40,7 +35,7 @@ jobs:
           path: checked_out_repo
           fetch-depth: 0
 
-      # ———————————————————————————————————————————————————————  Python + deps
+      # ———————————————————————————————————————————————————————  Python + deps
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -51,15 +46,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml
 
-      # ———————————————————————————————————————————————————————  AWS auth
+      # ———————————————————————————————————————————————————————  AWS auth
       - name: Configure AWS credentials (production S3)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.SECRET_ACCESS }}
-          aws-region:            ${{ secrets.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      # ———————————————————————————————————————————————————————  GEO generator
+      # ———————————————————————————————————————————————————————  GEO generator
       - name: Generate Markdown for ${{ matrix.subdomain }}
         id: geo_generate
         run: |
@@ -68,7 +63,7 @@ jobs:
 
           INPUT_DIR="checked_out_repo/content/"
           OUTPUT_DIR="checked_out_repo/geo/"
-          MAPPING_FILE="checked_out_repo/scripts/optimizer/${{ github.event.inputs.mapping_file }}"
+          MAPPING_FILE="checked_out_repo/scripts/optimizer/mapping.json"
           CLEAN_OUTPUT="${{ github.event.inputs.clean_output }}"
 
           # Clean output if requested
@@ -78,12 +73,12 @@ jobs:
           fi
 
           python3 checked_out_repo/scripts/optimizer/geo.py \
-            --input   "$INPUT_DIR" \
+            --input  "$INPUT_DIR" \
             --output  "$OUTPUT_DIR" \
             --subdomain "${{ matrix.subdomain }}" \
             --mapping "$MAPPING_FILE"
 
-      # ———————————————————————————————————————————————————————  Upload to S3
+      # ———————————————————————————————————————————————————————  Upload to S3
       - name: Upload ${{ matrix.subdomain }} output to S3 (production)
         id: upload_to_s3
         run: |
@@ -99,7 +94,7 @@ jobs:
             echo "Output directory $OUTPUT_DIR does not exist or is empty. Nothing to upload for $S3_BUCKET."
           fi
 
-      # ———————————————————————————————————————————————————————  Verify upload
+      # ———————————————————————————————————————————————————————  Verify upload
       - name: Verify llms.txt upload time
         if: success() # Only runs if the previous step was successful.
         run: |
