@@ -1,4 +1,4 @@
-name: Query Collector
+name: gsc-query-collector
 
 on:
   schedule:
@@ -14,8 +14,13 @@ jobs:
     env:
       GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
     steps:
-      - name: Checkout current repository
+      - name: Checkout aspose.net repository
         uses: actions/checkout@v3
+        with:
+          # Updated repository location – note the correct casing for the organization
+          repository: Aspose/aspose.net
+          token: ${{ secrets.REPO_TOKEN }}
+          path: checked_out_repo
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -27,17 +32,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2
 
-      - name: Checkout destination repository
-        uses: actions/checkout@v3
-        with:
-          # Updated repository location – note the correct casing for the organization
-          repository: Aspose/aspose.net
-          token: ${{ secrets.REPO_TOKEN }}
-          path: destination_repo
-
       - name: Run keyword extraction for ${{ matrix.subdomain }}
         run: |
-          python scripts/gsc/query-collector.py --subdomain ${{ matrix.subdomain }} --base-dir destination_repo/keywords
+          python checked_out_repo/scripts/google/query-collector.py --subdomain ${{ matrix.subdomain }} --base-dir destination_repo/keywords
 
       - name: Commit and push changes for ${{ matrix.subdomain }}
         working-directory: destination_repo
