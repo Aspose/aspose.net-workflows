@@ -37,7 +37,7 @@ jobs:
           python checked_out_repo/scripts/google/query-collector.py --subdomain ${{ matrix.subdomain }} --base-dir destination_repo/keywords
 
       - name: Commit and push changes for ${{ matrix.subdomain }}
-        working-directory: destination_repo
+        working-directory: checked_out_repo
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
