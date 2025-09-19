@@ -1,4 +1,4 @@
-name: Sitemap Submission
+name: Google Sitemap Submission
 on:
   workflow_dispatch:
   schedule:
@@ -9,8 +9,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v2
+      # Checks out the target repository only once.
+    - name: Checkout theme repo
+      uses: actions/checkout@v4
+      with:
+        repository: Aspose/aspose.net
+        token: ${{ secrets.REPO_TOKEN }}
+        path: checked_out_repo
+        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -25,4 +31,4 @@ jobs:
       env:
         GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
       run: |
-        python scripts/gsc/sitemap_submission_google.py
+        python checked_out_repo/scripts/google/sitemaps.py
