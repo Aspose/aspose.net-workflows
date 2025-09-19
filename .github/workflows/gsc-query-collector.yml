@@ -34,7 +34,7 @@ jobs:
 
       - name: Run keyword extraction for ${{ matrix.subdomain }}
         run: |
-          python checked_out_repo/scripts/google/query-collector.py --subdomain ${{ matrix.subdomain }} --base-dir destination_repo/keywords
+          python checked_out_repo/scripts/google/query-collector.py --subdomain ${{ matrix.subdomain }} --base-dir checked_out_repo/keywords
 
       - name: Commit and push changes for ${{ matrix.subdomain }}
         working-directory: checked_out_repo
