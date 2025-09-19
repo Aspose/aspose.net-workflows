@@ -38,7 +38,7 @@ jobs:
         run: hugo --config "./configs/about.aspose.net.toml" -b "${{ env.url }}" --cleanDestinationDir --minify --templateMetrics --templateMetricsHints --enableGitInfo
 
       - name: Deploy about.aspose.net to S3
-        run: hugo deploy --config "configs/about.aspose.net.toml" --target "${{ github.event.inputs.environment }}" --invalidateCDN --force
+        run: hugo deploy --config "configs/about.aspose.net.toml" --maxDeletes=0 --target "${{ github.event.inputs.environment }}" --invalidateCDN --force
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
