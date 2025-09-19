@@ -31,4 +31,4 @@ jobs:
       env:
         GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
       run: |
-        python checked_out_repo/scripts/google/sitemaps.py
+        python checked_out_repo/scripts/google/sitemap.py
