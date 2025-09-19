@@ -1,4 +1,4 @@
-name: Yandex Sitemap Submission
+name: submit-yandex-sitemap
 on:
   workflow_dispatch:
   schedule:

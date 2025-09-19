@@ -1,4 +1,4 @@
-name: Google Sitemap Submission
+name: submit-google-sitemap
 on:
   workflow_dispatch:
   schedule:
@@ -31,4 +31,4 @@ jobs:
       env:
         GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
       run: |
-        python checked_out_repo/scripts/google/sitemap.py
+        python checked_out_repo/scripts/google/sitemaps.py
