@@ -59,11 +59,11 @@ jobs:
         id: geo_generate
         run: |
           set -e
-          echo "Starting geo.py for subdomain: ${{ matrix.subdomain }}"
+          echo "Starting llms-generator.py for subdomain: ${{ matrix.subdomain }}"
 
           INPUT_DIR="checked_out_repo/content/"
           OUTPUT_DIR="checked_out_repo/geo/"
-          MAPPING_FILE="checked_out_repo/scripts/optimizer/mapping.json"
+          MAPPING_FILE="checked_out_repo/scripts/generator/mapping.json"
           CLEAN_OUTPUT="${{ github.event.inputs.clean_output }}"
 
           # Clean output if requested
@@ -72,7 +72,7 @@ jobs:
             rm -rf "${OUTPUT_DIR}${{ matrix.subdomain }}/"
           fi
 
-          python3 checked_out_repo/scripts/optimizer/geo.py \
+          python3 checked_out_repo/scripts/generator/llms-generator.py \
             --input  "$INPUT_DIR" \
             --output  "$OUTPUT_DIR" \
             --subdomain "${{ matrix.subdomain }}" \
