@@ -6,7 +6,7 @@ on:
       subdomains:
         description: "JSON array of sub-domains"
         required: false
-        default: '["about.aspose.net","products.aspose.net","websites.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]'
+        default: '["blog.aspose.net","about.aspose.net","products.aspose.net","websites.aspose.net","kb.aspose.net","reference.aspose.net","docs.aspose.net"]'
       clean_output:
         description: "Clean output folders before processing? (true/false)"
         required: false
