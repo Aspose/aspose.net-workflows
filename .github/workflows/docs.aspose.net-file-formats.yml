@@ -26,14 +26,14 @@ jobs:
       id: base-url
       run: |
         if [ "${{ github.event.inputs.environment }}" = "production" ]; then
-          echo "::set-output name=url::https://docs.aspose.net/formats"
+          echo "::set-output name=url::https://docs.aspose.net/file-formats"
         else
-          echo "::set-output name=url::https://docs-qa.aspose.net/formats"
+          echo "::set-output name=url::https://docs-qa.aspose.net/file-formats"
         fi
     - name: Build Aspose.Imaging
-      run: hugo --config "./configs/docs.aspose.net/formats.toml" -b "${{ steps.base-url.outputs.url }}" --cleanDestinationDir --minify --templateMetrics --templateMetricsHints --enableGitInfo
+      run: hugo --config "./configs/docs.aspose.net/file-formats.toml" -b "${{ steps.base-url.outputs.url }}" --cleanDestinationDir --minify --templateMetrics --templateMetricsHints --enableGitInfo
     - name: Deploy Aspose.Imaging to S3
-      run: hugo deploy --config "configs/docs.aspose.net/formats.toml" --maxDeletes=-1 --target "${{ github.event.inputs.environment }}" --force
+      run: hugo deploy --config "configs/docs.aspose.net/file-formats.toml" --maxDeletes=-1 --target "${{ github.event.inputs.environment }}" --force
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
