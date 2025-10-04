@@ -37,19 +37,6 @@ jobs:
       - name: Build reference.aspose.net with Hugo
         run: hugo --config "./configs/reference.aspose.net/home.toml" -b "${{ env.url }}" --cleanDestinationDir --minify --templateMetrics --templateMetricsHints --enableGitInfo
 
-      # Adding Python setup and merging script step
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      - name: Install dependencies
-        run: pip install requests
-
-      # Execute the merge script from the 'scripts' folder with dynamic base URL
-      - name: Run JSON merge script
-        run: python scripts/merge_search_data.py "${{ env.url }}"
-
       - name: Deploy reference.aspose.net to S3
         run: hugo deploy --config "configs/reference.aspose.net/home.toml" --target "${{ github.event.inputs.environment }}" --invalidateCDN --force
         env:
