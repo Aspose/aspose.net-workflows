@@ -29,7 +29,8 @@ FOLDER_MAP = {
     "Aspose.SVG": "svg",
     "Aspose.Finance": "finance",
     "Aspose.OMR": "omr",
-    "Aspose.Drawing": "drawing"
+    "Aspose.Drawing": "drawing",
+    "Aspose.Medical": "medical"
 }
 
 # ✅ Log all received arguments for debugging
