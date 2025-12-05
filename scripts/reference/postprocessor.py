@@ -273,6 +273,10 @@ def add_meta_info_to_file(file_path, layout_value):
             content = file.read()
             title, description, summary, category = extract_meta_info(content)
 
+            # For Namespace pages, set description to title
+            if category == "Namespace":
+                description = title
+
             # Remove the first line from the content
             content = '\n'.join(content.splitlines()[1:])
 
