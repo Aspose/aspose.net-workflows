@@ -1,0 +1,16 @@
+apiRules:
+  # 1) Include all classes from Aspose.Slides.LowCode namespace
+  - include:
+      uidRegex: '^(?:T:)?Aspose\.Slides\.LowCode(?:$|\..+)'
+
+  # 2) Include specific classes in Aspose.Slides namespace
+  - include:
+      uidRegex: '^(?:T:)?Aspose\.Slides\.(?:Presentation|Slide|PresentationFactory)(?:$|\..+)'
+
+  # 3) Include Aspose.Slides.Export classes and enums
+  - include:
+      uidRegex: '^(?:T:)?Aspose\.Slides\.Export\.(?:ISlidesLayoutOptions|NotesCommentsLayoutingOptions|NotesPositions|IRenderingOptions|RenderingOptions|ISaveOptions|SaveOptions|ITiffOptions|TiffOptions|TiffCompressionTypes|IPdfOptions|PdfOptions|IHtmlOptions|HtmlOptions|SaveFormat|ISVGOptions|SVGOptions)(?:$|\..+)'
+
+  # 4) Exclude everything else
+  - exclude:
+      uidRegex: '.*'
