@@ -1,0 +1,38 @@
+name: kb.aspose.net-slides
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Build environment'
+        type: environment
+        default: staging
+        required: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout theme repo
+      uses: actions/checkout@main
+      with:
+          repository: Aspose/aspose.net
+          token: ${{ secrets.REPO_TOKEN }}
+          fetch-depth: 0 
+    - name: Setup Hugo
+      uses: peaceiris/actions-hugo@v2
+      with:
+          hugo-version: '0.136.0'
+    - name: Determine Base URL
+      id: base-url
+      run: |
+        if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+          echo "::set-output name=url::https://kb.aspose.net/slides"
+        else
+          echo "::set-output name=url::https://kb-qa.aspose.net/slides"
+        fi
+    - name: Build Aspose.Slides
+      run: hugo --config "./configs/kb.aspose.net/slides.toml" -b "${{ steps.base-url.outputs.url }}" --cleanDestinationDir --minify --templateMetrics --templateMetricsHints --enableGitInfo
+    - name: Deploy Aspose.Slides to S3
+      run: hugo deploy --config "configs/kb.aspose.net/slides.toml" --maxDeletes=-1 --target "${{ github.event.inputs.environment }}" --force
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}

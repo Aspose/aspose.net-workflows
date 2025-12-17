@@ -1,0 +1,87 @@
+name: reference.aspose.net-slides
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1) Immediately wipe the huge hosted toolcache and other SDKs
+      - name: Free up host toolcache & caches
+        run: |
+          sudo rm -rf /opt/hostedtoolcache/* \
+                     /usr/share/dotnet     \
+                     /usr/local/share/dotnet \
+                     /usr/local/lib/android  \
+                     /var/lib/apt/lists/*    \
+                     $RUNNER_TOOL_CACHE      \
+                     $HOME/.cache
+      # 0) Purge the runner’s own diag logs
+      # Keep this as it directly addresses the directory in the error
+      - name: Clean up runner diagnostic logs
+        if: runner.os == 'Linux'
+        run: sudo rm -rf /home/runner/runners/*/_diag/* || true
+
+      # 3) Sparse-checkout only the folders you need + HEAD only
+      - name: Checkout only needed folders
+        uses: actions/checkout@v4
+        with:
+          repository: Aspose/aspose.net
+          token: ${{ secrets.REPO_TOKEN }}
+          fetch-depth: 1
+          sparse-checkout: |
+            assets
+            configs
+            content/reference.aspose.net/slides
+            layouts
+            static
+            themes/docs
+          sparse-checkout-cone-mode: false
+
+      # 5) Install Hugo
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: '0.136.0'
+
+      # 6) Compute base URL based on environment
+      - name: Determine Base URL
+        id: base-url
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+            echo "url=https://reference.aspose.net/slides" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://reference-qa.aspose.net/slides" >> $GITHUB_OUTPUT
+          fi
+
+      # 7) Build the site in quiet mode
+      # This is the step where the failure likely occurs
+      - name: Build Aspose.Slides
+        run: |
+          hugo --quiet \
+            --config "./configs/reference.aspose.net/slides.toml" \
+            -b "${{ steps.base-url.outputs.url }}" \
+            --cleanDestinationDir \
+            --minify
+
+      # 8) Deploy to S3 quietly
+      - name: Deploy Aspose.Slides to S3
+        run: |
+          hugo deploy --quiet \
+            --config "configs/reference.aspose.net/slides.toml" \
+            --maxDeletes=-1 \
+            --target "${{ github.event.inputs.environment }}" \
+            --force
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
