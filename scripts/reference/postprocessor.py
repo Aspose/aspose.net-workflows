@@ -88,17 +88,20 @@ def extract_meta_info(file_content):
 
 def replace_xref_tags_in_content(content):
     """Replace <xref> tags with plain text links and decode special characters."""
-    if '<' in content and '>' in content:  # Check for HTML-like content
-        try:
-            soup = BeautifulSoup(content, 'html.parser')
-            for xref in soup.find_all('xref'):
-                href_text = xref.get('href', '')
-                decoded_href = unquote(href_text)  # Decode special characters
-                xref.replace_with(f'{decoded_href}')
-            return str(soup)
-        except Exception as e:
-            print(f"Error parsing content with BeautifulSoup: {e}")
-    return content  # Return the original content if it's not HTML-like
+    # Use regex to replace xref tags without affecting other HTML structure
+    # Pattern matches: <xref href="...">...</xref> or <xref href="..." />
+    def replace_xref(match):
+        href = match.group(1)
+        decoded_href = unquote(href)  # Decode special characters
+        return decoded_href
+
+    # Match self-closing xref tags: <xref href="..." />
+    content = re.sub(r'<xref\s+href="([^"]*?)"\s*/>', replace_xref, content)
+
+    # Match xref tags with content: <xref href="...">...</xref>
+    content = re.sub(r'<xref\s+href="([^"]*?)"[^>]*?>.*?</xref>', replace_xref, content, flags=re.DOTALL)
+
+    return content
 
 
 def clean_yaml_field(value):
@@ -188,8 +191,9 @@ def format_section_to_table(content, section_name):
 def format_examples(content):
 
     # Case 1: Handle both C# and Visual Basic code blocks correctly
+    # Use negative lookahead to prevent matching across code block boundaries
     content = re.sub(
-        r'<pre><code class="lang-csharp">\[C#\](.*?)\[Visual Basic\](.*?)</code></pre>',
+        r'<pre><code class="lang-csharp">\[C#\]((?:(?!</code></pre>).)*?)\[Visual Basic\]((?:(?!</code></pre>).)*?)</code></pre>',
         lambda m: f'\n```csharp\n{m.group(1).strip()}\n```\n```vb\n{m.group(2).strip()}\n```',
         content, flags=re.DOTALL
     )
