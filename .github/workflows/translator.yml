@@ -18,7 +18,7 @@ on:
 
 jobs:
   prepare-matrix:
-    name: Prepare Family-Language Matrix
+    name: Prepare Family-Language Matrix 
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set_matrix.outputs.matrix }}
@@ -139,7 +139,7 @@ jobs:
             --cache_folder aspose-net/translation \
             --device auto \
             --target_languages "${{ matrix.language }}" \
-            --batch_size 6 \
+            --batch_size 8 \
             --existing_cache_folder translationcache &
           TRANSLATION_PID=$!
 
