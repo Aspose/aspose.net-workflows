@@ -38,73 +38,73 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
 
-    - name: Deploy to Ceph (production)
-      if: ${{ github.event.inputs.environment == 'production' }}
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.CEPH_DOCS_ASPOSE_NET_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.CEPH_DOCS_ASPOSE_NET_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: us-east-1
-      run: |
-        echo "Attempting Hugo deploy to Ceph..."
-        if hugo deploy --config "configs/docs.aspose.net/slides.toml" --target "production_ceph" --force; then
-          echo "Hugo deploy to Ceph succeeded"
-        else
-          echo "Hugo deploy failed, falling back to AWS CLI..."
+      - name: Deploy to Ceph (production)
+        if: ${{ github.event.inputs.environment == 'production' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CEPH_DOCS_ASPOSE_NET_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CEPH_DOCS_ASPOSE_NET_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          echo "Attempting Hugo deploy to Ceph..."
+          if hugo deploy --config "configs/docs.aspose.net/slides.toml" --target "production_ceph" --force; then
+            echo "Hugo deploy to Ceph succeeded"
+          else
+            echo "Hugo deploy failed, falling back to AWS CLI..."
 
-          # AWS CLI fallback for large files / multipart upload issues
-          BUCKET="docs-aspose-net"
-          PREFIX="slides/"
-          ENDPOINT="https://s3.dynabic.com"
-          REGION="us-east-1"
+            # AWS CLI fallback for large files / multipart upload issues
+            BUCKET="docs-aspose-net"
+            PREFIX="slides/"
+            ENDPOINT="https://s3.dynabic.com"
+            REGION="us-east-1"
 
-          echo "Deploying to s3://$BUCKET/$PREFIX via AWS CLI"
+            echo "Deploying to s3://$BUCKET/$PREFIX via AWS CLI"
 
-          # Sync all files first
-          aws s3 sync public/ "s3://$BUCKET/$PREFIX" \
-            --endpoint-url "$ENDPOINT" \
-            --region "$REGION" \
-            --delete
+            # Sync all files first
+            aws s3 sync public/ "s3://$BUCKET/$PREFIX" \
+              --endpoint-url "$ENDPOINT" \
+              --region "$REGION" \
+              --delete
 
-          # Apply cache control for XML files
-          aws s3 cp public/ "s3://$BUCKET/$PREFIX" \
-            --endpoint-url "$ENDPOINT" \
-            --region "$REGION" \
-            --recursive \
-            --exclude "*" \
-            --include "*.xml" \
-            --cache-control "max-age=3600, public" \
-            --metadata-directive REPLACE
+            # Apply cache control for XML files
+            aws s3 cp public/ "s3://$BUCKET/$PREFIX" \
+              --endpoint-url "$ENDPOINT" \
+              --region "$REGION" \
+              --recursive \
+              --exclude "*" \
+              --include "*.xml" \
+              --cache-control "max-age=3600, public" \
+              --metadata-directive REPLACE
 
-          # Apply cache control for static assets (JS/CSS/SVG)
-          aws s3 cp public/ "s3://$BUCKET/$PREFIX" \
-            --endpoint-url "$ENDPOINT" \
-            --region "$REGION" \
-            --recursive \
-            --exclude "*" \
-            --include "*.js" \
-            --include "*.css" \
-            --include "*.svg" \
-            --cache-control "max-age=22880000, no-transform, public" \
-            --metadata-directive REPLACE
+            # Apply cache control for static assets (JS/CSS/SVG)
+            aws s3 cp public/ "s3://$BUCKET/$PREFIX" \
+              --endpoint-url "$ENDPOINT" \
+              --region "$REGION" \
+              --recursive \
+              --exclude "*" \
+              --include "*.js" \
+              --include "*.css" \
+              --include "*.svg" \
+              --cache-control "max-age=22880000, no-transform, public" \
+              --metadata-directive REPLACE
 
-          # Apply cache control for images
-          aws s3 cp public/ "s3://$BUCKET/$PREFIX" \
-            --endpoint-url "$ENDPOINT" \
-            --region "$REGION" \
-            --recursive \
-            --exclude "*" \
-            --include "*.png" \
-            --include "*.jpg" \
-            --include "*.ico" \
-            --cache-control "max-age=22880000, no-transform, public" \
-            --metadata-directive REPLACE
+            # Apply cache control for images
+            aws s3 cp public/ "s3://$BUCKET/$PREFIX" \
+              --endpoint-url "$ENDPOINT" \
+              --region "$REGION" \
+              --recursive \
+              --exclude "*" \
+              --include "*.png" \
+              --include "*.jpg" \
+              --include "*.ico" \
+              --cache-control "max-age=22880000, no-transform, public" \
+              --metadata-directive REPLACE
 
-          echo "AWS CLI deployment to Ceph completed"
-        fi
-    - name: Deploy Aspose.Slides to Ceph (staging only)
-      if: ${{ github.event.inputs.environment == 'staging' }}
-      run: hugo deploy --config "configs/docs.aspose.net/slides.toml" --target "staging_ceph" --force
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.CEPH_DOCS_QA_ASPOSE_NET_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.CEPH_DOCS_QA_ASPOSE_NET_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: us-east-1
+            echo "AWS CLI deployment to Ceph completed"
+          fi
+      - name: Deploy Aspose.Slides to Ceph (staging only)
+        if: ${{ github.event.inputs.environment == 'staging' }}
+        run: hugo deploy --config "configs/docs.aspose.net/slides.toml" --target "staging_ceph" --force
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CEPH_DOCS_QA_ASPOSE_NET_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CEPH_DOCS_QA_ASPOSE_NET_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
