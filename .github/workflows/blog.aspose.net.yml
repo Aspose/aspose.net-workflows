@@ -52,20 +52,19 @@ jobs:
           echo "✗ Hugo deploy failed, falling back to AWS CLI..."
 
           BUCKET="blog-qa-aspose-net"
-          PREFIX=""
           ENDPOINT="https://s3.dynabic.com"
           REGION="us-east-1"
 
-          echo "Deploying to s3://$BUCKET/$PREFIX via AWS CLI"
+          echo "Deploying to s3://$BUCKET/ via AWS CLI"
 
           # Sync all files
-          aws s3 sync public/ "s3://$BUCKET/$PREFIX" \
+          aws s3 sync public/ "s3://$BUCKET/" \
             --endpoint-url "$ENDPOINT" \
             --region "$REGION" \
             --delete
 
           # Apply cache control for XML files
-          aws s3 cp public/ "s3://$BUCKET/$PREFIX" \
+          aws s3 cp public/ "s3://$BUCKET/" \
             --endpoint-url "$ENDPOINT" \
             --region "$REGION" \
             --recursive \
@@ -75,7 +74,7 @@ jobs:
             --metadata-directive REPLACE
 
           # Apply cache control for static assets (JS/CSS/SVG)
-          aws s3 cp public/ "s3://$BUCKET/$PREFIX" \
+          aws s3 cp public/ "s3://$BUCKET/" \
             --endpoint-url "$ENDPOINT" \
             --region "$REGION" \
             --recursive \
@@ -87,7 +86,7 @@ jobs:
             --metadata-directive REPLACE
 
           # Apply cache control for images
-          aws s3 cp public/ "s3://$BUCKET/$PREFIX" \
+          aws s3 cp public/ "s3://$BUCKET/" \
             --endpoint-url "$ENDPOINT" \
             --region "$REGION" \
             --recursive \

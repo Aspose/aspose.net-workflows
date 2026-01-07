@@ -65,6 +65,9 @@ jobs:
 
           echo "Deploying to s3://$BUCKET/$PREFIX via AWS CLI"
 
+          # Set multipart threshold to 100MB to avoid Ceph multipart upload issues
+          aws configure set s3.multipart_threshold 100MB
+
           # Sync all files first
           aws s3 sync public/ "s3://$BUCKET/$PREFIX" \
             --endpoint-url "$ENDPOINT" \
