@@ -57,6 +57,10 @@ jobs:
 
             echo "Deploying to s3://$BUCKET/ via AWS CLI"
 
+            # Configure multipart threshold to 100MB to avoid multipart upload issues
+            aws configure set default.s3.multipart_threshold 100MB
+            aws configure set default.s3.multipart_chunksize 100MB
+
             # Sync all files
             aws s3 sync public/ "s3://$BUCKET/" \
               --endpoint-url "$ENDPOINT" \
