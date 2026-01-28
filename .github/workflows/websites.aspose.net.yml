@@ -52,7 +52,7 @@ jobs:
             echo "✗ Hugo deploy failed, falling back to AWS CLI..."
 
             BUCKET="websites-qa-aspose-net"
-            ENDPOINT="https://s3-admin-qa.dynabic.com"
+            ENDPOINT="https://s3-website-qa.dynabic.com"
             REGION="us-east-1"
 
             echo "Deploying to s3://$BUCKET/ via AWS CLI"
