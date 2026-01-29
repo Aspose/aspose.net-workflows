@@ -47,14 +47,14 @@ jobs:
         if: ${{ github.event.inputs.environment == 'staging' }}
         run: hugo deploy --config "configs/kb.aspose.net/home.toml" --target "staging_ceph" --force
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CEPH_KB_QA_ASPOSE_NET_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CEPH_KB_QA_ASPOSE_NET_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CEPH_QA_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CEPH_QA_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
       - name: Deploy to Ceph (production)
         if: ${{ github.event.inputs.environment == 'production' }}
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CEPH_KB_ASPOSE_NET_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CEPH_KB_ASPOSE_NET_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CEPH_PRODUCTION_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CEPH_PRODUCTION_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: |
           echo "Attempting Hugo deploy to Ceph..."
@@ -65,7 +65,7 @@ jobs:
 
             # AWS CLI fallback for large files / multipart upload issues
             BUCKET="kb-aspose-net"
-            PREFIX="home/"
+            PREFIX=""
             ENDPOINT="https://s3.dynabic.com"
             REGION="us-east-1"
 
