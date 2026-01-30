@@ -42,6 +42,15 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
+
+      - name: Deploy to Ceph (staging)
+        if: ${{ github.event.inputs.environment == 'staging' }}
+        run: hugo deploy --config "configs/about.aspose.net.toml" --target "staging_ceph" --force
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CEPH_QA_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CEPH_QA_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+
       - name: Deploy to Ceph (production)
         if: ${{ github.event.inputs.environment == 'production' }}
         env:
