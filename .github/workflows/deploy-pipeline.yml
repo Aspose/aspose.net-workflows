@@ -15,50 +15,57 @@ on:
 jobs:
   staging:
     runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ github.repository }}   # gives gh CLI repo context without a checkout
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Trigger staging deployments
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: trigger_staging
         run: |
           set -eo pipefail
           WORKFLOWS='${{ github.event.inputs.workflows }}'
           COUNT=$(echo "$WORKFLOWS" | jq length)
-          echo "Triggering $COUNT workflows to staging..."
+          echo "Triggering $COUNT workflow(s) to staging..."
+
+          # Record timestamp just before triggering so the poller can filter stale runs
+          TRIGGER_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "trigger_time=$TRIGGER_TIME" >> $GITHUB_OUTPUT
 
           readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
           for wf in "${WF_ARRAY[@]}"; do
             echo "Triggering staging: $wf"
-            if gh workflow run "$wf" --field environment=staging; then
-              echo "  -> Triggered"
-            else
-              echo "  -> WARNING: Failed to trigger $wf"
-            fi
+            gh workflow run "$wf" --field environment=staging \
+              || { echo "FATAL: Failed to trigger $wf — aborting"; exit 1; }
+            echo "  -> Triggered OK"
             sleep 5
           done
 
       - name: Wait for all staging runs to complete
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
           WORKFLOWS='${{ github.event.inputs.workflows }}'
+          TRIGGER_TIME='${{ steps.trigger_staging.outputs.trigger_time }}'
           POLL_INTERVAL=60
-          TIMEOUT=5400  # 90 minutes max
+          TIMEOUT=5400  # 90 minutes max per workflow
 
-          echo "Waiting 90s for staging runs to start..."
+          echo "Waiting 90s for staging runs to appear..."
           sleep 90
 
           readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
           for wf in "${WF_ARRAY[@]}"; do
-            echo "--- Polling: $wf ---"
-            ELAPSED=0
+            echo "--- Polling: $wf (runs created after $TRIGGER_TIME) ---"
+            ELAPSED=90  # already waited 90s
 
             while [ $ELAPSED -lt $TIMEOUT ]; do
-              RUN_JSON=$(gh run list --workflow="$wf" --limit 1 \
-                --json status,conclusion,databaseId 2>/dev/null || echo "[]")
+              # Filter to only runs created at or after our trigger timestamp
+              RUN_JSON=$(gh run list --workflow="$wf" --limit 5 \
+                --json status,conclusion,databaseId,createdAt 2>/dev/null \
+                | jq --arg since "$TRIGGER_TIME" \
+                    '[.[] | select(.createdAt >= $since)]' \
+                || echo "[]")
 
-              if [ "$RUN_JSON" = "[]" ] || [ -z "$RUN_JSON" ]; then
-                echo "  No runs found yet, waiting..."
+              if [ "$RUN_JSON" = "[]" ] || [ "$(echo "$RUN_JSON" | jq length)" = "0" ]; then
+                echo "  Run not visible yet (elapsed ${ELAPSED}s)..."
                 sleep $POLL_INTERVAL
                 ELAPSED=$((ELAPSED + POLL_INTERVAL))
                 continue
@@ -70,21 +77,21 @@ jobs:
               if [ "$STATUS" = "completed" ]; then
                 CONCLUSION=$(echo "$RUN_JSON" | jq -r '.[0].conclusion')
                 if [ "$CONCLUSION" = "success" ]; then
-                  echo "  ✓ Staging PASSED: $wf (run $RUN_ID)"
+                  echo "  Staging PASSED: $wf (run $RUN_ID)"
                 else
-                  echo "  ✗ Staging FAILED: $wf (run $RUN_ID, conclusion: $CONCLUSION)"
+                  echo "  Staging FAILED: $wf (run $RUN_ID, conclusion: $CONCLUSION)"
                   exit 1
                 fi
                 break
               fi
 
-              echo "  Status: $STATUS (run $RUN_ID) — waiting..."
+              echo "  Status: $STATUS (run $RUN_ID, elapsed ${ELAPSED}s)..."
               sleep $POLL_INTERVAL
               ELAPSED=$((ELAPSED + POLL_INTERVAL))
             done
 
             if [ $ELAPSED -ge $TIMEOUT ]; then
-              echo "  ✗ TIMEOUT waiting for staging: $wf"
+              echo "  TIMEOUT waiting for staging: $wf"
               exit 1
             fi
           done
@@ -95,50 +102,55 @@ jobs:
   production:
     needs: staging
     runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ github.repository }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Trigger production deployments
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: trigger_production
         run: |
           set -eo pipefail
           WORKFLOWS='${{ github.event.inputs.workflows }}'
           COUNT=$(echo "$WORKFLOWS" | jq length)
-          echo "All $COUNT staging runs passed. Triggering production..."
+          echo "All $COUNT staging run(s) passed. Triggering production..."
+
+          TRIGGER_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "trigger_time=$TRIGGER_TIME" >> $GITHUB_OUTPUT
 
           readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
           for wf in "${WF_ARRAY[@]}"; do
             echo "Triggering production: $wf"
-            if gh workflow run "$wf" --field environment=production; then
-              echo "  -> Triggered"
-            else
-              echo "  -> WARNING: Failed to trigger $wf"
-            fi
+            gh workflow run "$wf" --field environment=production \
+              || { echo "FATAL: Failed to trigger $wf — aborting"; exit 1; }
+            echo "  -> Triggered OK"
             sleep 5
           done
 
       - name: Wait for all production runs to complete
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
           WORKFLOWS='${{ github.event.inputs.workflows }}'
+          TRIGGER_TIME='${{ steps.trigger_production.outputs.trigger_time }}'
           POLL_INTERVAL=60
-          TIMEOUT=5400  # 90 minutes max
+          TIMEOUT=5400
 
-          echo "Waiting 90s for production runs to start..."
+          echo "Waiting 90s for production runs to appear..."
           sleep 90
 
           readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
           for wf in "${WF_ARRAY[@]}"; do
-            echo "--- Polling: $wf ---"
-            ELAPSED=0
+            echo "--- Polling: $wf (runs created after $TRIGGER_TIME) ---"
+            ELAPSED=90
 
             while [ $ELAPSED -lt $TIMEOUT ]; do
-              RUN_JSON=$(gh run list --workflow="$wf" --limit 1 \
-                --json status,conclusion,databaseId 2>/dev/null || echo "[]")
+              RUN_JSON=$(gh run list --workflow="$wf" --limit 5 \
+                --json status,conclusion,databaseId,createdAt 2>/dev/null \
+                | jq --arg since "$TRIGGER_TIME" \
+                    '[.[] | select(.createdAt >= $since)]' \
+                || echo "[]")
 
-              if [ "$RUN_JSON" = "[]" ] || [ -z "$RUN_JSON" ]; then
-                echo "  No runs found yet, waiting..."
+              if [ "$RUN_JSON" = "[]" ] || [ "$(echo "$RUN_JSON" | jq length)" = "0" ]; then
+                echo "  Run not visible yet (elapsed ${ELAPSED}s)..."
                 sleep $POLL_INTERVAL
                 ELAPSED=$((ELAPSED + POLL_INTERVAL))
                 continue
@@ -150,21 +162,21 @@ jobs:
               if [ "$STATUS" = "completed" ]; then
                 CONCLUSION=$(echo "$RUN_JSON" | jq -r '.[0].conclusion')
                 if [ "$CONCLUSION" = "success" ]; then
-                  echo "  ✓ Production PASSED: $wf (run $RUN_ID)"
+                  echo "  Production PASSED: $wf (run $RUN_ID)"
                 else
-                  echo "  ✗ Production FAILED: $wf (run $RUN_ID, conclusion: $CONCLUSION)"
+                  echo "  Production FAILED: $wf (run $RUN_ID, conclusion: $CONCLUSION)"
                   exit 1
                 fi
                 break
               fi
 
-              echo "  Status: $STATUS (run $RUN_ID) — waiting..."
+              echo "  Status: $STATUS (run $RUN_ID, elapsed ${ELAPSED}s)..."
               sleep $POLL_INTERVAL
               ELAPSED=$((ELAPSED + POLL_INTERVAL))
             done
 
             if [ $ELAPSED -ge $TIMEOUT ]; then
-              echo "  ✗ TIMEOUT waiting for production: $wf"
+              echo "  TIMEOUT waiting for production: $wf"
               exit 1
             fi
           done
