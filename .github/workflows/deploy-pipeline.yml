@@ -234,7 +234,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git pull --rebase
           git add scripts/deploy/scan_state.json scripts/deploy/deploy_manifest.json
           git diff --cached --quiet || git commit -m "Scan state: deployment completed $(date -u +%Y-%m-%d)"
+          git pull --rebase
           git push
