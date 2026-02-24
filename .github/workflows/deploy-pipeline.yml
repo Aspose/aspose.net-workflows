@@ -1,0 +1,228 @@
+name: Deploy Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflows:
+        description: 'JSON array of workflow filenames to trigger'
+        required: true
+        type: string
+      content_sha:
+        description: 'Content repo SHA being deployed'
+        required: true
+        type: string
+
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger staging deployments
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          WORKFLOWS='${{ github.event.inputs.workflows }}'
+          COUNT=$(echo "$WORKFLOWS" | jq length)
+          echo "Triggering $COUNT workflows to staging..."
+
+          readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
+          for wf in "${WF_ARRAY[@]}"; do
+            echo "Triggering staging: $wf"
+            if gh workflow run "$wf" --field environment=staging; then
+              echo "  -> Triggered"
+            else
+              echo "  -> WARNING: Failed to trigger $wf"
+            fi
+            sleep 5
+          done
+
+      - name: Wait for all staging runs to complete
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          WORKFLOWS='${{ github.event.inputs.workflows }}'
+          POLL_INTERVAL=60
+          TIMEOUT=5400  # 90 minutes max
+
+          echo "Waiting 90s for staging runs to start..."
+          sleep 90
+
+          readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
+          for wf in "${WF_ARRAY[@]}"; do
+            echo "--- Polling: $wf ---"
+            ELAPSED=0
+
+            while [ $ELAPSED -lt $TIMEOUT ]; do
+              RUN_JSON=$(gh run list --workflow="$wf" --limit 1 \
+                --json status,conclusion,databaseId 2>/dev/null || echo "[]")
+
+              if [ "$RUN_JSON" = "[]" ] || [ -z "$RUN_JSON" ]; then
+                echo "  No runs found yet, waiting..."
+                sleep $POLL_INTERVAL
+                ELAPSED=$((ELAPSED + POLL_INTERVAL))
+                continue
+              fi
+
+              STATUS=$(echo "$RUN_JSON" | jq -r '.[0].status')
+              RUN_ID=$(echo "$RUN_JSON" | jq -r '.[0].databaseId')
+
+              if [ "$STATUS" = "completed" ]; then
+                CONCLUSION=$(echo "$RUN_JSON" | jq -r '.[0].conclusion')
+                if [ "$CONCLUSION" = "success" ]; then
+                  echo "  ✓ Staging PASSED: $wf (run $RUN_ID)"
+                else
+                  echo "  ✗ Staging FAILED: $wf (run $RUN_ID, conclusion: $CONCLUSION)"
+                  exit 1
+                fi
+                break
+              fi
+
+              echo "  Status: $STATUS (run $RUN_ID) — waiting..."
+              sleep $POLL_INTERVAL
+              ELAPSED=$((ELAPSED + POLL_INTERVAL))
+            done
+
+            if [ $ELAPSED -ge $TIMEOUT ]; then
+              echo "  ✗ TIMEOUT waiting for staging: $wf"
+              exit 1
+            fi
+          done
+
+          echo ""
+          echo "=== All staging deployments completed successfully ==="
+
+  production:
+    needs: staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger production deployments
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          WORKFLOWS='${{ github.event.inputs.workflows }}'
+          COUNT=$(echo "$WORKFLOWS" | jq length)
+          echo "All $COUNT staging runs passed. Triggering production..."
+
+          readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
+          for wf in "${WF_ARRAY[@]}"; do
+            echo "Triggering production: $wf"
+            if gh workflow run "$wf" --field environment=production; then
+              echo "  -> Triggered"
+            else
+              echo "  -> WARNING: Failed to trigger $wf"
+            fi
+            sleep 5
+          done
+
+      - name: Wait for all production runs to complete
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          WORKFLOWS='${{ github.event.inputs.workflows }}'
+          POLL_INTERVAL=60
+          TIMEOUT=5400  # 90 minutes max
+
+          echo "Waiting 90s for production runs to start..."
+          sleep 90
+
+          readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
+          for wf in "${WF_ARRAY[@]}"; do
+            echo "--- Polling: $wf ---"
+            ELAPSED=0
+
+            while [ $ELAPSED -lt $TIMEOUT ]; do
+              RUN_JSON=$(gh run list --workflow="$wf" --limit 1 \
+                --json status,conclusion,databaseId 2>/dev/null || echo "[]")
+
+              if [ "$RUN_JSON" = "[]" ] || [ -z "$RUN_JSON" ]; then
+                echo "  No runs found yet, waiting..."
+                sleep $POLL_INTERVAL
+                ELAPSED=$((ELAPSED + POLL_INTERVAL))
+                continue
+              fi
+
+              STATUS=$(echo "$RUN_JSON" | jq -r '.[0].status')
+              RUN_ID=$(echo "$RUN_JSON" | jq -r '.[0].databaseId')
+
+              if [ "$STATUS" = "completed" ]; then
+                CONCLUSION=$(echo "$RUN_JSON" | jq -r '.[0].conclusion')
+                if [ "$CONCLUSION" = "success" ]; then
+                  echo "  ✓ Production PASSED: $wf (run $RUN_ID)"
+                else
+                  echo "  ✗ Production FAILED: $wf (run $RUN_ID, conclusion: $CONCLUSION)"
+                  exit 1
+                fi
+                break
+              fi
+
+              echo "  Status: $STATUS (run $RUN_ID) — waiting..."
+              sleep $POLL_INTERVAL
+              ELAPSED=$((ELAPSED + POLL_INTERVAL))
+            done
+
+            if [ $ELAPSED -ge $TIMEOUT ]; then
+              echo "  ✗ TIMEOUT waiting for production: $wf"
+              exit 1
+            fi
+          done
+
+          echo ""
+          echo "=== All production deployments completed successfully ==="
+
+  finalize:
+    needs: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workflows repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.REPO_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Update scan state and manifest
+        run: |
+          python3 << 'PYEOF'
+          import json
+          from datetime import datetime, timezone
+
+          now = datetime.now(timezone.utc).isoformat()
+
+          # Update scan state
+          state = {
+              "last_scanned_sha": "${{ github.event.inputs.content_sha }}",
+              "last_scan_time": now,
+          }
+          with open("scripts/deploy/scan_state.json", "w") as f:
+              json.dump(state, f, indent=2)
+          print(f"Updated scan_state.json: SHA={state['last_scanned_sha']}")
+
+          # Update manifest
+          try:
+              with open("scripts/deploy/deploy_manifest.json", "r") as f:
+                  manifest = json.load(f)
+              manifest["staging_status"] = "completed"
+              manifest["production_status"] = "completed"
+              manifest["completed_at"] = now
+              with open("scripts/deploy/deploy_manifest.json", "w") as f:
+                  json.dump(manifest, f, indent=2)
+              print("Updated deploy_manifest.json with completion status")
+          except Exception as e:
+              print(f"Warning: Could not update manifest: {e}")
+          PYEOF
+
+      - name: Commit state update
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git pull --rebase
+          git add scripts/deploy/scan_state.json scripts/deploy/deploy_manifest.json
+          git diff --cached --quiet || git commit -m "Scan state: deployment completed $(date -u +%Y-%m-%d)"
+          git push

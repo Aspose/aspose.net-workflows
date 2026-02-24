@@ -1,0 +1,84 @@
+name: Change Scanner
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # Daily at 4 AM UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Log changes without triggering deployments'
+        type: boolean
+        default: false
+        required: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workflows repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.REPO_TOKEN }}
+
+      - name: Checkout content repo
+        uses: actions/checkout@v4
+        with:
+          repository: Aspose/aspose.net
+          token: ${{ secrets.REPO_TOKEN }}
+          fetch-depth: 0
+          path: content-repo
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Read last scanned SHA
+        id: state
+        run: |
+          if [ -f scripts/deploy/scan_state.json ]; then
+            LAST_SHA=$(python3 -c "import json; d=json.load(open('scripts/deploy/scan_state.json')); print(d.get('last_scanned_sha',''))")
+          else
+            LAST_SHA=""
+          fi
+          echo "last_sha=$LAST_SHA" >> $GITHUB_OUTPUT
+
+      - name: Detect changes and write manifest
+        id: detect
+        run: |
+          python3 scripts/deploy/detect_changes.py \
+            content-repo \
+            "${{ steps.state.outputs.last_sha }}" \
+            --manifest scripts/deploy/deploy_manifest.json
+
+      - name: Commit manifest
+        if: steps.detect.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add scripts/deploy/deploy_manifest.json
+          git diff --cached --quiet || git commit -m "Deploy manifest: $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Trigger deploy pipeline
+        if: steps.detect.outputs.has_changes == 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Triggering deploy pipeline..."
+          gh workflow run deploy-pipeline.yml \
+            --field "workflows=${{ steps.detect.outputs.workflows }}" \
+            --field "content_sha=${{ steps.detect.outputs.new_sha }}"
+          echo "Deploy pipeline triggered successfully."
+
+      - name: Dry run summary
+        if: steps.detect.outputs.has_changes == 'true' && github.event.inputs.dry_run == 'true'
+        run: |
+          echo "=== DRY RUN — no deployments triggered ==="
+          echo "Workflows that would be triggered:"
+          echo '${{ steps.detect.outputs.workflows }}' | python3 -m json.tool
+
+      - name: No changes detected
+        if: steps.detect.outputs.has_changes != 'true'
+        run: echo "No content changes since last scan. Nothing to deploy."

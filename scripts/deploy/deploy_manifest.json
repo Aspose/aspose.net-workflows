@@ -1,0 +1,10 @@
+{
+  "scan_id": "",
+  "content_sha": "",
+  "previous_sha": "",
+  "detected_at": "",
+  "global_change": false,
+  "affected_workflows": [],
+  "staging_status": "",
+  "production_status": ""
+}
