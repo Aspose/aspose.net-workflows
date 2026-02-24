@@ -80,6 +80,7 @@
     "websites.aspose.net.yml",
     "www.aspose.net.yml"
   ],
-  "staging_status": "pending",
-  "production_status": "pending"
+  "staging_status": "completed",
+  "production_status": "completed",
+  "completed_at": "2026-02-24T10:28:25.181476+00:00"
 }
