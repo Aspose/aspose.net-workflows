@@ -21,9 +21,10 @@ jobs:
     steps:
       - name: Trigger staging deployments
         id: trigger_staging
+        env:
+          WORKFLOWS: ${{ github.event.inputs.workflows }}
         run: |
           set -eo pipefail
-          WORKFLOWS='${{ github.event.inputs.workflows }}'
           COUNT=$(echo "$WORKFLOWS" | jq length)
           echo "Triggering $COUNT workflow(s) to staging..."
 
@@ -41,10 +42,11 @@ jobs:
           done
 
       - name: Wait for all staging runs to complete
+        env:
+          WORKFLOWS: ${{ github.event.inputs.workflows }}
+          TRIGGER_TIME: ${{ steps.trigger_staging.outputs.trigger_time }}
         run: |
           set -eo pipefail
-          WORKFLOWS='${{ github.event.inputs.workflows }}'
-          TRIGGER_TIME='${{ steps.trigger_staging.outputs.trigger_time }}'
           POLL_INTERVAL=60
           TIMEOUT=5400  # 90 minutes max per workflow
 
@@ -108,9 +110,10 @@ jobs:
     steps:
       - name: Trigger production deployments
         id: trigger_production
+        env:
+          WORKFLOWS: ${{ github.event.inputs.workflows }}
         run: |
           set -eo pipefail
-          WORKFLOWS='${{ github.event.inputs.workflows }}'
           COUNT=$(echo "$WORKFLOWS" | jq length)
           echo "All $COUNT staging run(s) passed. Triggering production..."
 
@@ -127,10 +130,11 @@ jobs:
           done
 
       - name: Wait for all production runs to complete
+        env:
+          WORKFLOWS: ${{ github.event.inputs.workflows }}
+          TRIGGER_TIME: ${{ steps.trigger_production.outputs.trigger_time }}
         run: |
           set -eo pipefail
-          WORKFLOWS='${{ github.event.inputs.workflows }}'
-          TRIGGER_TIME='${{ steps.trigger_production.outputs.trigger_time }}'
           POLL_INTERVAL=60
           TIMEOUT=5400
 

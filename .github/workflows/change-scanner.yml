@@ -65,11 +65,14 @@ jobs:
         if: steps.detect.outputs.has_changes == 'true' && github.event.inputs.dry_run != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOWS_JSON: ${{ steps.detect.outputs.workflows }}
+          CONTENT_SHA: ${{ steps.detect.outputs.new_sha }}
         run: |
           echo "Triggering deploy pipeline..."
+          echo "Workflows: $WORKFLOWS_JSON"
           gh workflow run deploy-pipeline.yml \
-            --field "workflows=${{ steps.detect.outputs.workflows }}" \
-            --field "content_sha=${{ steps.detect.outputs.new_sha }}"
+            --field "workflows=$WORKFLOWS_JSON" \
+            --field "content_sha=$CONTENT_SHA"
           echo "Deploy pipeline triggered successfully."
 
       - name: Dry run summary
