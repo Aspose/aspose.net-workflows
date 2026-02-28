@@ -12,6 +12,7 @@
     "reference.aspose.net-barcode.yml",
     "reference.aspose.net-home.yml"
   ],
-  "staging_status": "pending",
-  "production_status": "pending"
+  "staging_status": "completed",
+  "production_status": "completed",
+  "completed_at": "2026-02-28T16:12:11.517914+00:00"
 }
