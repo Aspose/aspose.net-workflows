@@ -7,6 +7,7 @@
   "affected_workflows": [
     "blog.aspose.net.yml"
   ],
-  "staging_status": "pending",
-  "production_status": "pending"
+  "staging_status": "completed",
+  "production_status": "completed",
+  "completed_at": "2026-03-05T06:44:30.078113+00:00"
 }
