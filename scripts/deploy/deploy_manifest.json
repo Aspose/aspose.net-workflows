@@ -11,6 +11,7 @@
     "products.aspose.net-home.yml",
     "products.aspose.net-slides.yml"
   ],
-  "staging_status": "pending",
-  "production_status": "pending"
+  "staging_status": "completed",
+  "production_status": "completed",
+  "completed_at": "2026-03-13T06:59:31.816201+00:00"
 }
