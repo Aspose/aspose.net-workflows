@@ -1,15 +1,14 @@
 {
-  "scan_id": "20260321-050229",
-  "content_sha": "337c4ea47ae8916b7f4274ba1a49a296b2e82a58",
-  "previous_sha": "4a5d3c60b7e3e4087c362b52b8c7919d01aadfec",
-  "detected_at": "2026-03-21T05:02:29.211363+00:00",
+  "scan_id": "20260322-051600",
+  "content_sha": "7bfd884d1d5d5dc4885b407d5c58602b48e8fade",
+  "previous_sha": "337c4ea47ae8916b7f4274ba1a49a296b2e82a58",
+  "detected_at": "2026-03-22T05:16:00.580093+00:00",
   "global_change": false,
   "affected_workflows": [
     "blog.aspose.net.yml",
-    "docs.aspose.net-file-formats.yml",
-    "docs.aspose.net-home.yml"
+    "products.aspose.net-home.yml",
+    "products.aspose.net-imaging.yml"
   ],
-  "staging_status": "completed",
-  "production_status": "completed",
-  "completed_at": "2026-03-21T06:59:15.842140+00:00"
+  "staging_status": "pending",
+  "production_status": "pending"
 }
