@@ -13,6 +13,7 @@
     "products.aspose.net-barcode.yml",
     "products.aspose.net-home.yml"
   ],
-  "staging_status": "pending",
-  "production_status": "pending"
+  "staging_status": "completed",
+  "production_status": "completed",
+  "completed_at": "2026-03-27T07:13:04.367680+00:00"
 }
