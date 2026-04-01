@@ -8,6 +8,7 @@
     "docs.aspose.net-home.yml",
     "docs.aspose.net-words.yml"
   ],
-  "staging_status": "pending",
-  "production_status": "pending"
+  "staging_status": "completed",
+  "production_status": "completed",
+  "completed_at": "2026-04-01T05:59:09.845226+00:00"
 }
