@@ -1,8 +1,8 @@
 {
-  "scan_id": "20260413-060907",
-  "content_sha": "38026827783f22beaa6f3f01cabe235982b4b36d",
+  "scan_id": "20260414-055532",
+  "content_sha": "b78b33c0c8c7c196e7d0eaa75c872ae29824a834",
   "previous_sha": "b8af284373cc68fd4ef99cb0982699f45b268b69",
-  "detected_at": "2026-04-13T06:09:07.262565+00:00",
+  "detected_at": "2026-04-14T05:55:32.026422+00:00",
   "global_change": false,
   "affected_workflows": [
     "blog.aspose.net.yml",
@@ -11,7 +11,9 @@
     "docs.aspose.net-cells.yml",
     "docs.aspose.net-file-formats.yml",
     "docs.aspose.net-home.yml",
+    "docs.aspose.net-tex.yml",
     "docs.aspose.net-words.yml",
+    "docs.aspose.net-zip.yml",
     "kb.aspose.net-barcode.yml",
     "kb.aspose.net-home.yml",
     "kb.aspose.net-words.yml",
@@ -26,8 +28,10 @@
     "products.aspose.net-page.yml",
     "products.aspose.net-pdf.yml",
     "products.aspose.net-psd.yml",
+    "products.aspose.net-slides.yml",
     "products.aspose.net-svg.yml",
     "products.aspose.net-tasks.yml",
+    "products.aspose.net-tex.yml",
     "products.aspose.net-words.yml",
     "products.aspose.net-zip.yml"
   ],
