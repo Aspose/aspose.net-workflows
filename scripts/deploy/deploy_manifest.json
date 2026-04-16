@@ -1,10 +1,11 @@
 {
-  "scan_id": "20260415-055523",
-  "content_sha": "eb42dba0626f580bed3a4202faaa094f8e960bf1",
+  "scan_id": "20260416-055606",
+  "content_sha": "1b4e473eadd4382703fc18b43dc7f2c33bcc5501",
   "previous_sha": "b8af284373cc68fd4ef99cb0982699f45b268b69",
-  "detected_at": "2026-04-15T05:55:23.697855+00:00",
+  "detected_at": "2026-04-16T05:56:06.972046+00:00",
   "global_change": false,
   "affected_workflows": [
+    "about.aspose.net.yml",
     "blog.aspose.net.yml",
     "docs.aspose.net-barcode.yml",
     "docs.aspose.net-cad.yml",
@@ -33,7 +34,9 @@
     "products.aspose.net-tasks.yml",
     "products.aspose.net-tex.yml",
     "products.aspose.net-words.yml",
-    "products.aspose.net-zip.yml"
+    "products.aspose.net-zip.yml",
+    "reference.aspose.net-barcode.yml",
+    "reference.aspose.net-home.yml"
   ],
   "staging_status": "pending",
   "production_status": "pending"
