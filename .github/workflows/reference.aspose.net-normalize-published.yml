@@ -1,0 +1,106 @@
+name: reference.aspose.net-normalize-published
+
+# On-demand normalizer for published English reference content.
+#
+# Runs normalize_snippets.py --lang en against the live content tree in
+# Aspose/aspose.net, so code-snippet formatting defects that slipped past
+# the monthly generation pipeline can be repaired without a full regeneration.
+#
+# Usage:
+#   - Set dry_run=true to see what would change without writing anything.
+#   - Set family to a specific family name (e.g. "imaging") to limit scope,
+#     or leave blank / set to "all" to scan every family.
+#
+# Safety guarantee: --lang en ensures only content/reference.aspose.net/*/en/
+# files are ever touched.  Non-English translations are never modified.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — report changes without writing files"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      family:
+        description: "Family to normalize (e.g. 'imaging') or 'all'"
+        required: false
+        default: "all"
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workflows repo
+        uses: actions/checkout@v4
+
+      - name: Checkout content repo
+        uses: actions/checkout@v4
+        with:
+          repository: Aspose/aspose.net
+          token: ${{ secrets.REPO_TOKEN }}
+          path: content-repo
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - name: Determine target directory
+        id: target
+        run: |
+          FAMILY="${{ github.event.inputs.family }}"
+          if [ -z "$FAMILY" ] || [ "$FAMILY" = "all" ]; then
+            echo "dir=content-repo/content/reference.aspose.net" >> "$GITHUB_OUTPUT"
+            echo "label=all families" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=content-repo/content/reference.aspose.net/$FAMILY" >> "$GITHUB_OUTPUT"
+            echo "label=$FAMILY" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run normalize_snippets.py (English only)
+        id: normalize
+        run: |
+          DRY_FLAG=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_FLAG="--dry-run"
+          fi
+          echo "=== normalize_snippets.py: ${{ steps.target.outputs.label }} --lang en $DRY_FLAG ==="
+          python scripts/reference/normalize_snippets.py \
+            "${{ steps.target.outputs.dir }}" \
+            --lang en \
+            $DRY_FLAG \
+            2>&1 | tee normalize-output.txt
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Upload normalization report
+        uses: actions/upload-artifact@v4
+        with:
+          name: normalize-report
+          path: normalize-output.txt
+          retention-days: 30
+
+      - name: Commit and push changes
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        working-directory: content-repo
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "No changes to commit — content is already normalized."
+          else
+            CHANGED=$(git diff --name-only | wc -l)
+            git add content/reference.aspose.net/
+            git commit -m "fix(reference): normalize code snippet indentation in en files
+
+Normalized by reference.aspose.net-normalize-published workflow.
+Scope: ${{ steps.target.outputs.label }}"
+            git push
+            echo "Committed and pushed $CHANGED changed file(s)."
+          fi
