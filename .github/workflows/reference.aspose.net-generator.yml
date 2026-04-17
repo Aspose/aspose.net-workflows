@@ -125,6 +125,8 @@ jobs:
               if ($LASTEXITCODE -ne 0) { exit 1 }
               python scripts/reference/postprocessor.py "${{ matrix.family.family }}" "${{ matrix.family.version }}"
               if ($LASTEXITCODE -ne 0) { exit 1 }
+              python scripts/reference/normalize_snippets.py workspace/docfx/api
+              if ($LASTEXITCODE -ne 0) { exit 1 }
           }
 
       - name: Prepare to Push

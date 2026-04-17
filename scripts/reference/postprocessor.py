@@ -3,6 +3,7 @@
 import sys
 import os
 import re
+import textwrap
 from bs4 import BeautifulSoup
 from urllib.parse import unquote
 
@@ -188,35 +189,94 @@ def format_section_to_table(content, section_name):
     return content
 
 
+def _norm(code: str) -> str:
+    """Normalize extracted code: expand tabs, strip leading/trailing blank lines, dedent."""
+    code = code.expandtabs(4)
+    lines = code.splitlines()
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if not lines:
+        return ''
+    return textwrap.dedent('\n'.join(lines))
+
+
+# VB.NET line-initial keywords that cannot appear at the start of a C# line
+_VB_LINE_START = re.compile(
+    r'^(End\s+(Using|Sub|Function|Class|If|Module|Namespace)|'
+    r'For\s+Each\s|'
+    r'Next\b|'
+    r'Using\s+\w|'
+    r'Dim\s+\w|'
+    r'Module\s+\w)',
+    re.MULTILINE
+)
+
+
+def _split_mixed_vbnet(content: str) -> str:
+    """
+    Find ```csharp fences that contain a VB.NET block concatenated after the C# block.
+    Split them into separate ```csharp and ```vb fences.
+    """
+    def split_fence(m):
+        lang = m.group(1)  # 'csharp'
+        body = m.group(2)
+        if lang != 'csharp' or not _VB_LINE_START.search(body):
+            return m.group(0)  # no change
+
+        lines = body.splitlines()
+        split_idx = None
+        # Find the first line that matches a VB.NET keyword
+        for i, line in enumerate(lines):
+            if _VB_LINE_START.match(line.lstrip()):
+                # Walk back to include any preceding blank line in the split
+                split_idx = i
+                while split_idx > 0 and not lines[split_idx - 1].strip():
+                    split_idx -= 1
+                break
+
+        if split_idx is None or split_idx == 0:
+            return m.group(0)  # couldn't find a clean boundary
+
+        cs_block = _norm('\n'.join(lines[:split_idx]))
+        vb_block = _norm('\n'.join(lines[split_idx:]))
+        if not cs_block or not vb_block:
+            return m.group(0)
+        return f'```csharp\n{cs_block}\n```\n```vb\n{vb_block}\n```'
+
+    return re.sub(r'```(csharp)\n(.*?)```', split_fence, content, flags=re.DOTALL)
+
+
 def format_examples(content):
 
     # Case 1: Handle both C# and Visual Basic code blocks correctly
     # Use negative lookahead to prevent matching across code block boundaries
     content = re.sub(
         r'<pre><code class="lang-csharp">\[C#\]((?:(?!</code></pre>).)*?)\[Visual Basic\]((?:(?!</code></pre>).)*?)</code></pre>',
-        lambda m: f'\n```csharp\n{m.group(1).strip()}\n```\n```vb\n{m.group(2).strip()}\n```',
+        lambda m: f'\n```csharp\n{_norm(m.group(1))}\n```\n```vb\n{_norm(m.group(2))}\n```',
         content, flags=re.DOTALL
     )
 
     # Case 2: Multiline C# code block without Visual Basic mention
     content = re.sub(
         r'<example><pre><code class="lang-csharp">(.*?)</code></pre></example>',
-        lambda m: f'\n```csharp\n{m.group(1).strip()}\n```',
+        lambda m: f'\n```csharp\n{_norm(m.group(1))}\n```',
         content, flags=re.DOTALL
     )
 
     # Combined Cases 3 & 4: Process generic C# code blocks
     def replace_csharp_block(match):
-        code = match.group(1).strip()
+        code = _norm(match.group(1))
         # Special check: remove leading "[C#]" if present
         if code.startswith("[C#]"):
-            code = code[len("[C#]"):].strip()
+            code = _norm(code[len("[C#]"):])
         # Format as inline if single-line, else as fenced block with 'csharp' on the same line
         if "\n" in code:
             return f'\n```csharp\n{code}\n```'
         else:
             return f'`{code}`'
-    
+
     content = re.sub(
         r'<pre><code class="lang-csharp">(.*?)</code></pre>',
         replace_csharp_block,
@@ -227,8 +287,8 @@ def format_examples(content):
     def process_example_block(match):
         # Extract content inside <example>
         description = match.group(1).strip()
-        code = match.group(2).strip()
-        
+        code = _norm(match.group(2))
+
         # Convert to a properly formatted markdown block
         formatted_block = f"{description}\n\n```csharp\n{code}\n```"
         return formatted_block
@@ -239,7 +299,7 @@ def format_examples(content):
         process_example_block,
         content, flags=re.DOTALL
     )
-    
+
     # Remove </attachedfile> if within <pre> & </pre>
     content = re.sub(
         r'(<pre>.*?</pre>)',
@@ -247,10 +307,13 @@ def format_examples(content):
         content,
         flags=re.DOTALL
     )
-    
+
     # Remove any additional Visual Basic tags
     content = re.sub(r'\[Visual Basic\]\s*', '', content)
     content = re.sub(r'\[VB\.NET\]\s*', '', content)
+
+    # Split any csharp fences that still contain mixed VB.NET code
+    content = _split_mixed_vbnet(content)
 
     return content
 
