@@ -5,6 +5,11 @@ normalize_snippets.py — post-processing normalization for reference markdown c
 Operates on already-generated markdown files (not HTML). Applies the same normalization
 logic used inside postprocessor.py's format_examples() so that:
   - Defect Class 1: massive leading whitespace in code lines is removed (textwrap.dedent)
+  - Defect Class 1b: orphan deep-indent blocks — e.g. C# object/array initializers where
+                     a brace is aligned with a class-name or 'new' keyword instead of
+                     using standard 4-space indentation.  Detected when a contiguous block
+                     of lines all have indent >= _ORPHAN_BLOCK_THRESHOLD (30) while the
+                     preceding code line is indented significantly less.
   - Defect Class 2: tab characters are expanded to 4 spaces
   - Defect Class 3: VB.NET code concatenated inside ```csharp fences is split into
                     separate ```csharp and ```vb fences
@@ -40,6 +45,15 @@ import difflib
 # ~18 levels = 72+ spaces), so 40 is well below the minimum artifact level while staying
 # above realistic intentional indentation depths.
 _BODY_DEDENT_THRESHOLD = 40
+
+# Lines with indent >= this value are candidates for orphan-block reindent (Class 1b).
+# Normal C# indentation rarely exceeds 24 spaces (6 nesting levels × 4 spaces), so
+# 30 safely separates intentional deep alignment from ordinary nested code.
+_ORPHAN_BLOCK_THRESHOLD = 30
+
+# Minimum adjustment (spaces to remove) required before applying orphan-block reindent.
+# Prevents triggering on mildly indented code that is fine as-is.
+_MIN_ORPHAN_ADJUSTMENT = 20
 
 # ---------------------------------------------------------------------------
 # Core normalization (mirrors _norm / _split_mixed_vbnet in postprocessor.py)
@@ -89,7 +103,102 @@ def _norm(code: str) -> str:
                     fixed.append(l[body_common:] if len(l) >= body_common else l.lstrip(' '))
                 return '\n'.join(fixed)
 
-    return '\n'.join(lines)
+    return '\n'.join(_reindent_orphan_blocks(lines))
+
+
+def _reindent_orphan_blocks(lines: list) -> list:
+    """
+    Defect Class 1b — orphan deep-indent blocks.
+
+    Finds contiguous runs of lines where every non-empty line has
+    indent >= _ORPHAN_BLOCK_THRESHOLD (30).  When such a block exists and its
+    minimum indent exceeds the preceding code line's indent by at least
+    _MIN_ORPHAN_ADJUSTMENT (20), the entire block is shifted left so that its
+    shallowest line aligns with the preceding line's indent level.
+
+    Example (C# object initializer aligned to 'new' keyword):
+
+        Before:
+            options.VectorRasterizationOptions = new CadRasterizationOptions
+                                                     {          ← 45 spaces
+                                                         LineScale = 0.25f  ← 49 spaces
+                                                     };
+
+        After:
+            options.VectorRasterizationOptions = new CadRasterizationOptions
+            {          ← 4 spaces (same indent as the statement)
+                LineScale = 0.25f  ← 8 spaces
+            };
+
+    Safe-guards:
+    - Only activates when adjustment >= _MIN_ORPHAN_ADJUSTMENT (prevents false positives
+      on mildly over-indented but acceptable code).
+    - Blank lines inside an orphan block are passed through unchanged.
+    - Lines whose indent would go negative are clamped to 0.
+    - Does not modify lines outside detected orphan blocks.
+    - Iterates until stable to handle deeply nested alignment artifacts where a single
+      pass may leave inner blocks still above the threshold.
+    """
+    result = list(lines)
+    while True:
+        changed = False
+        n = len(result)
+        i = 0
+        while i < n:
+            ln = result[i]
+            if not ln.strip():
+                i += 1
+                continue
+            ind = len(ln) - len(ln.lstrip(' '))
+            if ind < _ORPHAN_BLOCK_THRESHOLD:
+                i += 1
+                continue
+
+            # Found the start of a potential orphan block at index i.
+            block_start = i
+            block_end = i
+
+            # Extend the block forward as long as every non-empty line stays deep.
+            j = i + 1
+            while j < n:
+                candidate = result[j]
+                if candidate.strip():
+                    cind = len(candidate) - len(candidate.lstrip(' '))
+                    if cind < _ORPHAN_BLOCK_THRESHOLD:
+                        break
+                block_end = j
+                j += 1
+
+            # Find the indent of the nearest preceding non-empty line.
+            preceding_indent = 0
+            for k in range(block_start - 1, -1, -1):
+                prev = result[k]
+                if prev.strip():
+                    preceding_indent = len(prev) - len(prev.lstrip(' '))
+                    break
+
+            # Compute the minimum indent within the orphan block (non-empty lines only).
+            block_non_empty = [result[k] for k in range(block_start, block_end + 1)
+                               if result[k].strip()]
+            if block_non_empty:
+                block_min = min(len(l) - len(l.lstrip(' ')) for l in block_non_empty)
+                adjustment = block_min - preceding_indent
+                if adjustment >= _MIN_ORPHAN_ADJUSTMENT:
+                    for k in range(block_start, block_end + 1):
+                        bl = result[k]
+                        if bl.strip():
+                            old_ind = len(bl) - len(bl.lstrip(' '))
+                            new_ind = max(0, old_ind - adjustment)
+                            result[k] = ' ' * new_ind + bl.lstrip(' ')
+                        # blank lines: leave as-is
+                    changed = True
+
+            i = block_end + 1
+
+        if not changed:
+            break
+
+    return result
 
 
 _VB_LINE_START = re.compile(
@@ -169,6 +278,11 @@ def normalize_content(content: str):
             # Class 1: any non-empty line has >= 40 leading spaces (massive indent artifact)
             if any(len(l) - len(l.lstrip(' ')) >= 40 for l in original_lines if l.strip()):
                 defects.append(1)
+            # Class 1b: orphan deep-indent block (contiguous lines with indent >= 30
+            # while surrounding code is much shallower)
+            elif any(len(l) - len(l.lstrip(' ')) >= _ORPHAN_BLOCK_THRESHOLD
+                     for l in original_lines if l.strip()):
+                defects.append('1b')
             # Class 2: tab characters present
             if '\t' in body:
                 defects.append(2)
