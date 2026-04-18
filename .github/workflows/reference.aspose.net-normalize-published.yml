@@ -73,15 +73,24 @@ jobs:
           python scripts/reference/normalize_snippets.py \
             "${{ steps.target.outputs.dir }}" \
             --lang en \
+            --report normalize-report.json \
             $DRY_FLAG \
             2>&1 | tee normalize-output.txt
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
 
-      - name: Upload normalization report
+      - name: Upload normalization report (text)
         uses: actions/upload-artifact@v4
         with:
-          name: normalize-report
+          name: normalize-report-text
           path: normalize-output.txt
+          retention-days: 30
+
+      - name: Upload normalization report (JSON)
+        uses: actions/upload-artifact@v4
+        with:
+          name: normalize-report-json
+          path: normalize-report.json
+          if-no-files-found: ignore
           retention-days: 30
 
       - name: Commit and push changes

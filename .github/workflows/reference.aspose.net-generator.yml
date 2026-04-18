@@ -125,9 +125,18 @@ jobs:
               if ($LASTEXITCODE -ne 0) { exit 1 }
               python scripts/reference/postprocessor.py "${{ matrix.family.family }}" "${{ matrix.family.version }}"
               if ($LASTEXITCODE -ne 0) { exit 1 }
-              python scripts/reference/normalize_snippets.py workspace/docfx/api
+              python scripts/reference/normalize_snippets.py workspace/docfx/api --report normalize-report.json
               if ($LASTEXITCODE -ne 0) { exit 1 }
           }
+
+      - name: Upload normalization report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: normalize-report-${{ matrix.family.family }}
+          path: normalize-report.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Prepare to Push
         shell: pwsh
