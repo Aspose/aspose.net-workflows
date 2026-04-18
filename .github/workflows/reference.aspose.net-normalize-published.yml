@@ -122,10 +122,9 @@ jobs:
           else
             CHANGED=$(git diff --name-only | wc -l)
             git add content/reference.aspose.net/
-            git commit -m "fix(reference): normalize code snippet indentation in en files
-
-Normalized by reference.aspose.net-normalize-published workflow.
-Scope: ${{ steps.target.outputs.label }}"
+            SCOPE="${{ steps.target.outputs.label }}"
+            MSG="fix(reference): normalize code snippet indentation in en files ($SCOPE)"
+            git commit -m "$MSG"
             git push
             echo "Committed and pushed $CHANGED changed file(s)."
           fi
