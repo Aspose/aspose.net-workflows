@@ -4,6 +4,7 @@ import sys
 import os
 import re
 import textwrap
+import html as html_module
 from bs4 import BeautifulSoup
 from urllib.parse import unquote
 
@@ -248,6 +249,31 @@ def _split_mixed_vbnet(content: str) -> str:
     return re.sub(r'```(csharp)\n(.*?)```', split_fence, content, flags=re.DOTALL)
 
 
+# Single-group regex for splitting content at code-fence boundaries (prose vs fence).
+_PROSE_SPLIT_RE = re.compile(r'(```[^\n`]*\n.*?```)', re.DOTALL)
+
+
+def _decode_prose_entities(content: str) -> str:
+    """
+    Decode HTML entities (&lt; &gt; &amp; &#xa0; etc.) in markdown prose only.
+
+    Code fences are preserved verbatim — entities inside C#/VB string literals
+    that show HTML content (e.g. "&#xa0;" as a literal entity string) are intentional
+    and must not be altered.
+
+    Uses re.split() alternating pattern: even indices = prose (decoded),
+    odd indices = fences (left as-is).
+    """
+    parts = _PROSE_SPLIT_RE.split(content)
+    result = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:
+            result.append(part)       # fence — preserve as-is
+        else:
+            result.append(html_module.unescape(part))  # prose — decode entities
+    return ''.join(result)
+
+
 def format_examples(content):
 
     # Case 1: Handle both C# and Visual Basic code blocks correctly
@@ -354,8 +380,9 @@ def add_meta_info_to_file(file_path, layout_value):
             # Format and clean content
             content = replace_xref_tags_in_content(content)
             content = format_examples(content)
+            content = _decode_prose_entities(content)
             content = process_internal_links(content)
-            content = add_assembly_version(content)  
+            content = add_assembly_version(content)
 
 
             meta_info = f"""---

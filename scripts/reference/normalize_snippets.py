@@ -4,23 +4,34 @@ normalize_snippets.py — post-processing normalization for reference markdown c
 
 Operates on already-generated markdown files (not HTML). Applies the same normalization
 logic used inside postprocessor.py's format_examples() so that:
-  - Defect Class 1: massive leading whitespace in code lines is removed (textwrap.dedent)
+  - Defect Class 1:  massive leading whitespace in code lines is removed (textwrap.dedent)
   - Defect Class 1b: orphan deep-indent blocks — e.g. C# object/array initializers where
                      a brace is aligned with a class-name or 'new' keyword instead of
                      using standard 4-space indentation.  Detected when a contiguous block
                      of lines all have indent >= _ORPHAN_BLOCK_THRESHOLD (30) while the
                      preceding code line is indented significantly less.
-  - Defect Class 2: tab characters are expanded to 4 spaces
-  - Defect Class 3: VB.NET code concatenated inside ```csharp fences is split into
-                    separate ```csharp and ```vb fences
-  - Defect Class 4: blank lines at the start/end of code fences are stripped
+  - Defect Class 2:  tab characters are expanded to 4 spaces
+  - Defect Class 3:  VB.NET code concatenated inside ```csharp fences is split into
+                     separate ```csharp and ```vb fences
+  - Defect Class 4:  blank lines at the start/end of code fences are stripped
+  - Defect Class 5:  HTML entities (&lt; &gt; &amp; &#xa0; etc.) in markdown prose
+                     (outside code fences) are decoded to their literal characters.
+                     Code fences are left untouched — entities inside string literals
+                     in C# or VB code are intentional.
 
 Usage:
-    python normalize_snippets.py <directory> [--dry-run]
+    python normalize_snippets.py <directory> [--dry-run] [--lang <code>]
+                                             [--report <path>] [--llm]
 
-    <directory>  Root directory to scan recursively for .md files.
-    --dry-run    Report what would change without writing any files.
-                 Prints a per-fence before/after diff for every affected fence.
+    <directory>   Root directory to scan recursively for .md files.
+    --dry-run     Report what would change without writing any files.
+                  Prints a per-fence before/after diff for every affected fence.
+    --lang <code> Only apply fence normalization (Classes 1-4) to files under a
+                  /<code>/ directory segment.  Prose entity decoding (Class 5)
+                  is always applied to every file regardless of this filter.
+    --report <p>  Write a machine-readable JSON report to path <p>.
+    --llm         Enable the optional LLM quality-scanner pass (reads LLM_ENDPOINT
+                  and LLM_KEY from environment variables).  Disabled by default.
 
 Exit codes:
     0  Success (including dry-run with zero changes)
@@ -32,6 +43,9 @@ import os
 import re
 import textwrap
 import difflib
+import html as html_module
+import json
+import datetime
 
 # NOTE: The _norm() function in this file deliberately differs from the one in postprocessor.py:
 # - This file: strips LEADING blank lines only (conservative — avoids churn on existing files
@@ -215,6 +229,38 @@ _VB_LINE_START = re.compile(
 # Group 1 = language tag (may be empty), Group 2 = body (may be empty)
 _FENCE_RE = re.compile(r'(```([^\n`]*)\n)(.*?)(```)', re.DOTALL)
 
+# Single-group version of _FENCE_RE used to split content into prose/fence alternating
+# pieces for prose-only entity decoding.  Captured group = entire fence including markers.
+_FENCE_SPLIT_RE = re.compile(r'(```[^\n`]*\n.*?```)', re.DOTALL)
+
+# HTML entity pattern used to count entities in prose before decoding.
+_ENTITY_RE = re.compile(r'&(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);')
+
+
+def _decode_prose_entities(content: str) -> str:
+    """
+    Defect Class 5 — HTML entities in markdown prose.
+
+    Decodes HTML entities (&lt;, &gt;, &amp;, &#xa0;, &#NN;, etc.) in all portions
+    of content that are NOT inside a code fence.  Code fences are left verbatim so
+    that entities inside C#/VB string literals (e.g. "&#xa0;" as HTML content) are
+    preserved intentionally.
+
+    Uses re.split() with _FENCE_SPLIT_RE: odd-indexed parts are fences (preserved),
+    even-indexed parts are prose (decoded).  Idempotent: calling twice produces the
+    same result as calling once.
+    """
+    parts = _FENCE_SPLIT_RE.split(content)
+    result = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:
+            # Odd index → matched fence → leave as-is
+            result.append(part)
+        else:
+            # Even index → prose → decode entities
+            result.append(html_module.unescape(part))
+    return ''.join(result)
+
 
 def _normalize_fence_body(lang: str, body: str):
     """
@@ -325,32 +371,134 @@ def normalize_content(content: str):
         last_end = m.end()
 
     output_parts.append(content[last_end:])
-    return ''.join(output_parts), changes
+    fence_normalized = ''.join(output_parts)
+
+    # Phase 2 — Defect Class 5: decode HTML entities in prose outside fences.
+    # Applied regardless of whether fences changed: entities in prose are a separate
+    # defect class that does not interact with fence whitespace normalization.
+    prose_decoded = _decode_prose_entities(fence_normalized)
+    if prose_decoded != fence_normalized:
+        entity_count = len(_ENTITY_RE.findall(
+            # Count entities in the prose portions only (before decoding)
+            ''.join(
+                part for i, part in enumerate(_FENCE_SPLIT_RE.split(fence_normalized))
+                if i % 2 == 0
+            )
+        ))
+        changes.append({
+            'type': 'prose',
+            'lang': None,
+            'original': fence_normalized,
+            'normalized': prose_decoded,
+            'split_vb': None,
+            'defect_classes': [5],
+            'entities_decoded': entity_count,
+        })
+        return prose_decoded, changes
+
+    return fence_normalized, changes
+
+
+# ---------------------------------------------------------------------------
+# LLM quality scanner (optional — disabled by default)
+# ---------------------------------------------------------------------------
+
+def llm_classify_fence(lang: str, body: str) -> dict:
+    """
+    Send a code fence to the LLM endpoint for defect classification.
+
+    Reads LLM_ENDPOINT and LLM_KEY from environment variables.  Returns a
+    structured dict with fields: defect_type, explanation, proposed_fix,
+    confidence, semantic_risk, apply_fix.
+
+    Returns a safe 'skip' response if the endpoint is not configured, the
+    request fails, or the response cannot be parsed.
+
+    Validation rules applied BEFORE accepting a proposed fix:
+      - confidence >= 0.85
+      - semantic_risk != 'high'
+      - proposed_fix length change < 20% of original (prevents wholesale rewrites)
+    """
+    import os
+    endpoint = os.environ.get('LLM_ENDPOINT', '')
+    key = os.environ.get('LLM_KEY', '')
+    if not endpoint or not key:
+        return {'defect_type': 'skip', 'confidence': 0.0, 'apply_fix': False,
+                'explanation': 'LLM_ENDPOINT or LLM_KEY not set', 'proposed_fix': None,
+                'semantic_risk': 'unknown'}
+
+    try:
+        import requests as _requests
+        prompt = (
+            f'Analyze this {lang or "unknown"} code fence from API reference docs.\n'
+            f'Identify rendering/formatting defects. Return JSON only:\n'
+            f'{{"defect_type":"clean|excessive_indent|html_entity|malformed_fence|unknown",'
+            f'"explanation":"one sentence","proposed_fix":"corrected code or null",'
+            f'"confidence":0.0,"semantic_risk":"low|medium|high","apply_fix":true}}\n'
+            f'Code (first 2000 chars):\n{body[:2000]}'
+        )
+        resp = _requests.post(
+            endpoint,
+            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+            json={'messages': [{'role': 'user', 'content': prompt}]},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        result = json.loads(resp.json()['choices'][0]['message']['content'])
+
+        # Validate before flagging apply_fix=True
+        fix = result.get('proposed_fix')
+        if result.get('confidence', 0) < 0.85:
+            result['apply_fix'] = False
+        if result.get('semantic_risk') == 'high':
+            result['apply_fix'] = False
+        if fix and len(fix) > 0:
+            change_ratio = abs(len(fix) - len(body)) / max(len(body), 1)
+            if change_ratio > 0.20:
+                result['apply_fix'] = False
+        return result
+    except Exception as exc:
+        return {'defect_type': 'error', 'confidence': 0.0, 'apply_fix': False,
+                'explanation': str(exc), 'proposed_fix': None, 'semantic_risk': 'unknown'}
 
 
 # ---------------------------------------------------------------------------
 # File scanning
 # ---------------------------------------------------------------------------
 
-def scan_directory(root: str, dry_run: bool, lang: str = None):
+def scan_directory(root: str, dry_run: bool, lang: str = None,
+                   report: str = None, llm: bool = False):
     """Walk root, normalize every .md file, report and optionally write.
 
-    If lang is given (e.g. 'en'), only process files whose path contains
-    a /<lang>/ directory segment (i.e. content/reference.aspose.net/<family>/<lang>/).
+    Fence normalization (Classes 1-4) is restricted to files whose path contains
+    a /<lang>/ directory segment when lang is given.  Prose entity decoding
+    (Class 5) is applied to ALL files regardless of the lang filter, because
+    HTML entities in prose are wrong in every language.
+
+    Args:
+        root:    Directory to walk.
+        dry_run: If True, report changes but do not write files.
+        lang:    If set (e.g. 'en'), apply fence normalization only to files under
+                 a directory segment matching this language code.  Entity decoding
+                 (Class 5) is always applied to all files.
+        report:  If set, write a machine-readable JSON summary to this path.
+        llm:     If True, run the optional LLM quality-scanner on a sample of fences.
     """
     total_files = 0
     total_fences = 0
     changed_files = 0
     changed_fences = 0
+    defect_counts = {}          # {class_label: count}
+    llm_sent = 0
+    llm_accepted = 0
+    llm_rejected = 0
+    affected_families = set()
 
     for dirpath, _, filenames in os.walk(root):
-        # Language filter: skip directories that don't contain /<lang>/ in their path.
-        # Works whether root is reference.aspose.net/ (parts: family/lang) or a
-        # specific family dir (parts: lang).
-        if lang is not None:
-            parts = os.path.relpath(dirpath, root).replace('\\', '/').split('/')
-            if lang not in parts:
-                continue
+        # Determine whether this directory passes the language filter.
+        # Files that do NOT match still get prose entity decoding (Class 5).
+        parts = os.path.relpath(dirpath, root).replace('\\', '/').split('/')
+        is_lang_match = (lang is None) or (lang in parts)
 
         for fname in filenames:
             if not fname.endswith('.md'):
@@ -365,22 +513,70 @@ def scan_directory(root: str, dry_run: bool, lang: str = None):
                 print(f'[ERROR] Could not read {fpath}: {e}')
                 continue
 
-            new_content, changes = normalize_content(original)
-            # Count fences in original (rough count for stats)
+            # Fence count for statistics (always, regardless of lang filter)
             total_fences += len(list(_FENCE_RE.finditer(original)))
+
+            if is_lang_match:
+                # Full normalization: fence fixes + prose entity decoding
+                new_content, changes = normalize_content(original)
+            else:
+                # Entity-only pass: skip fence normalization for non-lang files
+                decoded = _decode_prose_entities(original)
+                if decoded != original:
+                    entity_count = len(_ENTITY_RE.findall(
+                        ''.join(
+                            part for i, part in
+                            enumerate(_FENCE_SPLIT_RE.split(original)) if i % 2 == 0
+                        )
+                    ))
+                    changes = [{
+                        'type': 'prose',
+                        'lang': None,
+                        'original': original,
+                        'normalized': decoded,
+                        'split_vb': None,
+                        'defect_classes': [5],
+                        'entities_decoded': entity_count,
+                    }]
+                    new_content = decoded
+                else:
+                    changes = []
+                    new_content = original
 
             if not changes:
                 continue
 
+            # Separate fence changes from prose changes for reporting
+            fence_changes = [c for c in changes if c.get('type') != 'prose']
+            prose_changes = [c for c in changes if c.get('type') == 'prose']
+
             changed_files += 1
-            changed_fences += len(changes)
+            changed_fences += len(fence_changes)
             rel_path = os.path.relpath(fpath, root)
+
+            # Track affected family (first path segment under root)
+            family = parts[0] if parts and parts[0] != '.' else 'root'
+            affected_families.add(family)
+
+            # Accumulate defect counts
+            for ch in changes:
+                for dc in ch['defect_classes']:
+                    key = str(dc)
+                    defect_counts[key] = defect_counts.get(key, 0) + 1
 
             print(f'\n{"="*72}')
             print(f'FILE: {rel_path}')
-            print(f'  {len(changes)} fence(s) would be {"changed" if dry_run else "changed"}')
+            n_fence = len(fence_changes)
+            n_prose = len(prose_changes)
+            summary_parts = []
+            if n_fence:
+                summary_parts.append(f'{n_fence} fence change(s)')
+            if n_prose:
+                total_entities = sum(c.get('entities_decoded', 0) for c in prose_changes)
+                summary_parts.append(f'prose: {total_entities} entity(ies) decoded')
+            print(f'  {", ".join(summary_parts)}')
 
-            for i, ch in enumerate(changes, 1):
+            for i, ch in enumerate(fence_changes, 1):
                 dc_labels = ', '.join(f'Class {d}' for d in ch['defect_classes']) or 'unknown'
                 print(f'\n  Fence #{i}  lang={ch["lang"] or "(none)"}  defects=[{dc_labels}]')
 
@@ -394,13 +590,28 @@ def scan_directory(root: str, dry_run: bool, lang: str = None):
                 if diff:
                     # Limit output to first 30 diff lines to avoid flooding
                     for line in diff[:30]:
-                        safe = ('    ' + line).encode(sys.stdout.encoding or 'utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8', errors='replace')
+                        safe = ('    ' + line).encode(
+                            sys.stdout.encoding or 'utf-8', errors='replace'
+                        ).decode(sys.stdout.encoding or 'utf-8', errors='replace')
                         print(safe)
                     if len(diff) > 30:
                         print(f'    ... ({len(diff) - 30} more diff lines)')
 
-                if ch['split_vb']:
-                    print(f'  [VB split] VB.NET block separated into ```vb fence ({len(ch["split_vb"].splitlines())} lines)')
+                if ch.get('split_vb'):
+                    print(f'  [VB split] VB.NET block separated into ```vb fence '
+                          f'({len(ch["split_vb"].splitlines())} lines)')
+
+                # Optional LLM quality scan on unchanged fences (novel defect detection)
+                if llm and not ch['defect_classes']:
+                    llm_sent += 1
+                    result = llm_classify_fence(ch['lang'], ch['original'])
+                    if result.get('apply_fix') and result.get('proposed_fix'):
+                        llm_accepted += 1
+                        print(f'  [LLM] {result["defect_type"]} '
+                              f'(confidence={result["confidence"]:.2f}): '
+                              f'{result["explanation"]}')
+                    else:
+                        llm_rejected += 1
 
             if not dry_run:
                 try:
@@ -409,14 +620,45 @@ def scan_directory(root: str, dry_run: bool, lang: str = None):
                 except Exception as e:
                     print(f'[ERROR] Could not write {fpath}: {e}')
 
+    verb = 'that would change' if dry_run else 'changed'
     print(f'\n{"="*72}')
     print(f'SUMMARY')
     print(f'  Files scanned  : {total_files}')
     print(f'  Fences found   : {total_fences}')
-    print(f'  Files {"that would change" if dry_run else "changed"}  : {changed_files}')
-    print(f'  Fences {"that would change" if dry_run else "changed"} : {changed_fences}')
+    print(f'  Files {verb}  : {changed_files}')
+    print(f'  Fences {verb} : {changed_fences}')
+    if defect_counts:
+        dc_str = ', '.join(f'Class {k}: {v}' for k, v in sorted(defect_counts.items()))
+        print(f'  Defect counts  : {dc_str}')
+    if llm:
+        print(f'  LLM sent/accepted/rejected: {llm_sent}/{llm_accepted}/{llm_rejected}')
     if dry_run:
         print(f'\n  DRY RUN — no files were written.')
+
+    # Write JSON report if requested
+    if report:
+        report_data = {
+            'run_at': datetime.datetime.utcnow().isoformat() + 'Z',
+            'root': root,
+            'lang_filter': lang,
+            'dry_run': dry_run,
+            'files_scanned': total_files,
+            'fences_scanned': total_fences,
+            'files_changed': changed_files,
+            'fences_changed': changed_fences,
+            'defect_counts': defect_counts,
+            'llm_sent': llm_sent,
+            'llm_accepted': llm_accepted,
+            'llm_rejected': llm_rejected,
+            'affected_families': sorted(affected_families),
+        }
+        try:
+            with open(report, 'w', encoding='utf-8') as rf:
+                json.dump(report_data, rf, indent=2)
+            print(f'\n  Report written: {report}')
+        except Exception as e:
+            print(f'[ERROR] Could not write report {report}: {e}')
+
     return changed_files
 
 
@@ -425,26 +667,37 @@ def scan_directory(root: str, dry_run: bool, lang: str = None):
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    flags = {'--dry-run', '--lang'}
-    dry_run = '--dry-run' in sys.argv[1:]
-
-    # Parse --lang <value>
+    dry_run = False
     lang = None
+    report = None
+    llm = False
     raw_args = sys.argv[1:]
     filtered = []
     i = 0
     while i < len(raw_args):
-        if raw_args[i] == '--lang' and i + 1 < len(raw_args):
+        a = raw_args[i]
+        if a == '--dry-run':
+            dry_run = True
+            i += 1
+        elif a == '--lang' and i + 1 < len(raw_args):
             lang = raw_args[i + 1]
             i += 2
-        elif raw_args[i] == '--dry-run':
+        elif a == '--report' and i + 1 < len(raw_args):
+            report = raw_args[i + 1]
+            i += 2
+        elif a == '--llm':
+            llm = True
+            i += 1
+        elif a == '--no-llm':
+            llm = False
             i += 1
         else:
-            filtered.append(raw_args[i])
+            filtered.append(a)
             i += 1
 
     if len(filtered) != 1:
-        print('Usage: python normalize_snippets.py <directory> [--dry-run] [--lang <code>]')
+        print('Usage: python normalize_snippets.py <directory> '
+              '[--dry-run] [--lang <code>] [--report <path>] [--llm]')
         sys.exit(1)
 
     root = filtered[0]
@@ -453,5 +706,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     if lang:
-        print(f'Language filter: {lang}')
-    scan_directory(root, dry_run=dry_run, lang=lang)
+        print(f'Language filter (fence normalization): {lang}')
+        print(f'Note: Prose entity decoding (Class 5) applies to ALL files.')
+    if llm:
+        print(f'LLM scanner: enabled (endpoint from LLM_ENDPOINT env var)')
+    scan_directory(root, dry_run=dry_run, lang=lang, report=report, llm=llm)
