@@ -262,16 +262,23 @@ def _decode_prose_entities(content: str) -> str:
     and must not be altered.
 
     Uses re.split() alternating pattern: even indices = prose (decoded),
-    odd indices = fences (left as-is).
+    odd indices = fences (left as-is).  Iterates until stable to handle
+    double-encoded entities (e.g. &amp;lt; → &lt; → <).
     """
-    parts = _PROSE_SPLIT_RE.split(content)
-    result = []
-    for i, part in enumerate(parts):
-        if i % 2 == 1:
-            result.append(part)       # fence — preserve as-is
-        else:
-            result.append(html_module.unescape(part))  # prose — decode entities
-    return ''.join(result)
+    result = content
+    while True:
+        parts = _PROSE_SPLIT_RE.split(result)
+        decoded_parts = []
+        for i, part in enumerate(parts):
+            if i % 2 == 1:
+                decoded_parts.append(part)
+            else:
+                decoded_parts.append(html_module.unescape(part))
+        decoded = ''.join(decoded_parts)
+        if decoded == result:
+            break
+        result = decoded
+    return result
 
 
 def format_examples(content):

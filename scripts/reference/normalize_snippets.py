@@ -247,19 +247,23 @@ def _decode_prose_entities(content: str) -> str:
     preserved intentionally.
 
     Uses re.split() with _FENCE_SPLIT_RE: odd-indexed parts are fences (preserved),
-    even-indexed parts are prose (decoded).  Idempotent: calling twice produces the
-    same result as calling once.
+    even-indexed parts are prose (decoded).  Iterates until stable to handle
+    double-encoded entities (e.g. &amp;lt; → &lt; → <) that require two passes.
     """
-    parts = _FENCE_SPLIT_RE.split(content)
-    result = []
-    for i, part in enumerate(parts):
-        if i % 2 == 1:
-            # Odd index → matched fence → leave as-is
-            result.append(part)
-        else:
-            # Even index → prose → decode entities
-            result.append(html_module.unescape(part))
-    return ''.join(result)
+    result = content
+    while True:
+        parts = _FENCE_SPLIT_RE.split(result)
+        decoded_parts = []
+        for i, part in enumerate(parts):
+            if i % 2 == 1:
+                decoded_parts.append(part)           # fence — preserve as-is
+            else:
+                decoded_parts.append(html_module.unescape(part))  # prose — decode
+        decoded = ''.join(decoded_parts)
+        if decoded == result:
+            break
+        result = decoded
+    return result
 
 
 def _normalize_fence_body(lang: str, body: str):
