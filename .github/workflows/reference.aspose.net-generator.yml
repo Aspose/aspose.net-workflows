@@ -115,6 +115,9 @@ jobs:
 
       - name: Process Family
         shell: pwsh
+        env:
+          LLM_ENDPOINT: ${{ secrets.LLM_ENDPOINT }}
+          LLM_KEY: ${{ secrets.LLM_KEY }}
         run: |
           Write-Host "Processing: ${{ matrix.family.family }}"
 
@@ -125,7 +128,7 @@ jobs:
               if ($LASTEXITCODE -ne 0) { exit 1 }
               python scripts/reference/postprocessor.py "${{ matrix.family.family }}" "${{ matrix.family.version }}"
               if ($LASTEXITCODE -ne 0) { exit 1 }
-              python scripts/reference/normalize_snippets.py workspace/docfx/api --report normalize-report.json
+              python scripts/reference/normalize_snippets.py workspace/docfx/api --report normalize-report.json --llm
               if ($LASTEXITCODE -ne 0) { exit 1 }
           }
 

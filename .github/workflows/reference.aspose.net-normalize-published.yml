@@ -29,6 +29,14 @@ on:
         description: "Family to normalize (e.g. 'imaging') or 'all'"
         required: false
         default: "all"
+      enable_llm:
+        description: "Run optional LLM quality scanner on unclassified fences"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
   normalize:
@@ -64,17 +72,25 @@ jobs:
 
       - name: Run normalize_snippets.py (English only)
         id: normalize
+        env:
+          LLM_ENDPOINT: ${{ secrets.LLM_ENDPOINT }}
+          LLM_KEY: ${{ secrets.LLM_KEY }}
         run: |
           DRY_FLAG=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             DRY_FLAG="--dry-run"
           fi
-          echo "=== normalize_snippets.py: ${{ steps.target.outputs.label }} --lang en $DRY_FLAG ==="
+          LLM_FLAG=""
+          if [ "${{ github.event.inputs.enable_llm }}" = "true" ]; then
+            LLM_FLAG="--llm"
+          fi
+          echo "=== normalize_snippets.py: ${{ steps.target.outputs.label }} --lang en $DRY_FLAG $LLM_FLAG ==="
           python scripts/reference/normalize_snippets.py \
             "${{ steps.target.outputs.dir }}" \
             --lang en \
             --report normalize-report.json \
             $DRY_FLAG \
+            $LLM_FLAG \
             2>&1 | tee normalize-output.txt
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
 
