@@ -150,6 +150,7 @@ jobs:
       - name: Push ${{ matrix.family.family }} to aspose.net/content/reference.aspose.net/
         env:
           REPO_TOKEN: ${{ secrets.ASPOSE_PAT }}
+          GH_TOKEN: ${{ secrets.ASPOSE_PAT }}
         run: python scripts/reference/push_to_repo.py "${{ matrix.family.family }}" "${{ matrix.family.version }}"
       
       - name: Update Status
