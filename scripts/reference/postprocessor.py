@@ -190,6 +190,10 @@ def format_section_to_table(content, section_name):
     return content
 
 
+# NOTE: This _norm() does not implement Class 1b (orphan deep-indent blocks).
+# Class 1b is handled by the normalize_snippets.py secondary pass, which always
+# runs after postprocessor.py in the generator workflow
+# (see .github/workflows/reference.aspose.net-generator.yml:131).
 def _norm(code: str) -> str:
     """Normalize extracted code: expand tabs, strip leading/trailing blank lines, dedent."""
     code = code.expandtabs(4)

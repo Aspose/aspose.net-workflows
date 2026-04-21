@@ -132,6 +132,9 @@ jobs:
               if ($LASTEXITCODE -ne 0) { exit 1 }
           }
 
+      - name: Verify normalization
+        run: python tests/verify_normalization.py
+
       - name: Upload normalization report
         if: always()
         uses: actions/upload-artifact@v4

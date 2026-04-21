@@ -102,7 +102,8 @@ def _norm(code: str) -> str:
     if non_empty:
         common = min(len(l) - len(l.lstrip(' ')) for l in non_empty)
         if common > 0:
-            return textwrap.dedent('\n'.join(lines))
+            dedented = textwrap.dedent('\n'.join(lines)).splitlines()
+            return '\n'.join(_reindent_orphan_blocks(dedented))
 
     # Body-only dedent: existing files where line 0 has indent 0 (stripped by old
     # postprocessor) but lines 1+ carry the original deep indentation.
@@ -115,7 +116,7 @@ def _norm(code: str) -> str:
                 fixed = [lines[0]]
                 for l in lines[1:]:
                     fixed.append(l[body_common:] if len(l) >= body_common else l.lstrip(' '))
-                return '\n'.join(fixed)
+                return '\n'.join(_reindent_orphan_blocks(fixed))
 
     return '\n'.join(_reindent_orphan_blocks(lines))
 
@@ -329,9 +330,10 @@ def normalize_content(content: str):
             if any(len(l) - len(l.lstrip(' ')) >= 40 for l in original_lines if l.strip()):
                 defects.append(1)
             # Class 1b: orphan deep-indent block (contiguous lines with indent >= 30
-            # while surrounding code is much shallower)
-            elif any(len(l) - len(l.lstrip(' ')) >= _ORPHAN_BLOCK_THRESHOLD
-                     for l in original_lines if l.strip()):
+            # while surrounding code is much shallower); independent of Class 1 —
+            # a fence may trigger both (e.g. common indent >= 40 AND an orphan block).
+            if any(len(l) - len(l.lstrip(' ')) >= _ORPHAN_BLOCK_THRESHOLD
+                   for l in original_lines if l.strip()):
                 defects.append('1b')
             # Class 2: tab characters present
             if '\t' in body:

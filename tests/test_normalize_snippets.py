@@ -114,6 +114,21 @@ class TestNorm:
         twice = _norm(once)
         assert once == twice
 
+    def test_standard_dedent_then_orphan_blocks_single_pass(self):
+        """TASK-01 regression guard: standard dedent + orphan block resolved in one _norm() call.
+
+        All lines share a 4-space common indent; after standard dedent line 0 has 0
+        indent but line 1 has 40-space orphan alignment.  Before the G1 fix, the
+        orphan block was left uncorrected after the early return from the standard-
+        dedent path.  After the fix, _reindent_orphan_blocks() is applied to the
+        dedented result in the same call.
+        """
+        code = '    line0\n' + '    ' + ' ' * 40 + 'orphan_line'
+        result = _norm(code)
+        # Standard dedent removes 4 common spaces → 'line0\n' + ' '*40 + 'orphan_line'
+        # Orphan pass: preceding=0, block_min=40, adjustment=40 >= 20 → shift left 40
+        assert result == 'line0\norphan_line'
+
     def test_mixed_tabs_and_spaces(self):
         """Tabs mixed with spaces: tabs expanded first, then dedent."""
         code = '\t    line1\n\t    line2'
@@ -221,6 +236,23 @@ class TestNormalizeContent:
         new_content, changes = normalize_content(content)
         # "End of string" is inside a string — _VB_LINE_START won't match at start of line
         assert changes == []
+
+    def test_dual_class1_and_1b_both_reported(self):
+        """TASK-02 regression guard: fence with Class 1 (>=40) AND Class 1b (>=30) reports both.
+
+        Before the G2 fix (elif), Class 1b was silently skipped whenever Class 1
+        fired first.  After the fix both classes are independently detected and
+        appended to defects[], giving accurate counts in normalize-report.json.
+        """
+        deep = ' ' * 72
+        orphan = ' ' * 35
+        content = f'```csharp\nmethodSig()\n{deep}body\n{orphan}orphan_block\n```'
+        _, changes = normalize_content(content)
+        fence_changes = [c for c in changes if c.get('type') != 'prose']
+        assert len(fence_changes) == 1
+        defects = fence_changes[0]['defect_classes']
+        assert 1 in defects
+        assert '1b' in defects
 
 
 # ---------------------------------------------------------------------------

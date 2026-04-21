@@ -1,0 +1,19 @@
+name: test-normalization
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Install test dependencies
+        run: pip install pytest
+      - name: Run unit tests
+        run: python -m pytest tests/test_normalize_snippets.py -v
+      - name: Run verification harness
+        run: python tests/verify_normalization.py
