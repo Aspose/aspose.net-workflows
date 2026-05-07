@@ -45,7 +45,7 @@ jobs:
         AWS_DEFAULT_REGION: us-east-1
       run: |
         echo "Attempting Hugo deploy to Ceph..."
-        if hugo deploy --config "configs/products.aspose.net/words.toml" --target "staging_ceph" --force; then
+        if hugo deploy --config "configs/products.aspose.net/words.toml" --target "staging_ceph" --maxDeletes=-1 --force; then
           echo "✓ Hugo deploy succeeded"
         else
           echo "✗ Hugo deploy failed, falling back to AWS CLI..."
@@ -111,7 +111,7 @@ jobs:
         AWS_DEFAULT_REGION: us-east-1
       run: |
         echo "Attempting Hugo deploy to Ceph..."
-        if hugo deploy --config "configs/products.aspose.net/words.toml" --target "production_ceph" --force; then
+        if hugo deploy --config "configs/products.aspose.net/words.toml" --target "production_ceph" --maxDeletes=-1 --force; then
           echo "Hugo deploy to Ceph succeeded"
         else
           echo "Hugo deploy failed, falling back to AWS CLI..."
