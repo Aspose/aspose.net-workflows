@@ -169,3 +169,12 @@ jobs:
 
           echo "AWS CLI deployment to Ceph completed"
         fi
+
+    - name: Purge BunnyCDN cache (production)
+      if: ${{ github.event.inputs.environment == 'production' }}
+      run: |
+        echo "Purging BunnyCDN cache for products.aspose.net..."
+        curl -siG -H "X-Api-Key: ${{ secrets.BUNNY_NET }}" \
+          --data-urlencode "url=https://products.aspose.net/*" \
+          "https://api.dynabic.com/bn/purge?async=true"
+        echo "✓ BunnyCDN purge request sent"
