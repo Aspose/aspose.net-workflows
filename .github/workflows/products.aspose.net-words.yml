@@ -32,7 +32,7 @@ jobs:
     - name: Build Aspose.words
       run: hugo --config "configs/common.toml,configs/products.aspose.net/words.toml" -b "${{ steps.base-url.outputs.url }}" --cleanDestinationDir --minify --templateMetrics --templateMetricsHints --enableGitInfo
     - name: Deploy Aspose.words to S3
-      run: hugo deploy --config "configs/common.toml,configs/products.aspose.net/words.toml" --maxDeletes=-1 --target "${{ github.event.inputs.environment }}" --force
+      run: hugo deploy --config "configs/common.toml,configs/products.aspose.net/words.toml" --maxDeletes=-1 --target "${{ github.event.inputs.environment }}" --invalidateCDN --force
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
