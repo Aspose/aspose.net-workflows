@@ -7,6 +7,14 @@ on:
         description: "Comma-separated list of products (e.g., Aspose.Words,Aspose.PDF) or 'all'"
         required: true
         default: "all"
+      dry_run:
+        description: "Dry run — normalize without pushing content or updating status"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
   schedule:
     - cron: "0 0 1 * *" # Runs on the 1st of every month
 
@@ -156,12 +164,14 @@ jobs:
           git config --global user.email "github-actions@github.com"
 
       - name: Push ${{ matrix.family.family }} to aspose.net/content/reference.aspose.net/
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
           REPO_TOKEN: ${{ secrets.ASPOSE_PAT }}
           GH_TOKEN: ${{ secrets.ASPOSE_PAT }}
         run: python scripts/reference/push_to_repo.py "${{ matrix.family.family }}" "${{ matrix.family.version }}"
-      
+
       - name: Update Status
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         shell: pwsh
         run: |
           python scripts/reference/update_status.py "${{ matrix.family.family }}" "${{ matrix.family.version }}"
