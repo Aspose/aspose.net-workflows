@@ -2,6 +2,15 @@ name: test-normalization
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 2 1 * *'   # 1st of month, 02:00 UTC — offset 2h from generator
+  push:
+    paths:
+      - 'scripts/reference/normalize_snippets.py'
+      - 'tests/test_normalize_snippets.py'
+      - 'tests/verify_normalization.py'
+    branches:
+      - main
 
 jobs:
   test:

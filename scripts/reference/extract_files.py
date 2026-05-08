@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import requests
 import zipfile
 
@@ -18,16 +19,26 @@ nupkg_path = f"packages/{nuget_name}.{nuget_version}.nupkg"
 os.makedirs("packages", exist_ok=True)
 
 # Download NuGet package
-try:
-    response = requests.get(download_url, stream=True)
-    response.raise_for_status()
-    with open(nupkg_path, "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
-    print(f"Downloaded: {nupkg_path}")
-except requests.RequestException as e:
-    print(f"Error downloading NuGet package: {e}")
-    sys.exit(1)
+max_attempts = 3
+for attempt in range(1, max_attempts + 1):
+    try:
+        print(f"Downloading {nuget_name} {nuget_version} (attempt {attempt}/{max_attempts})...")
+        response = requests.get(download_url, stream=True)
+        response.raise_for_status()
+        with open(nupkg_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print(f"Downloaded: {nupkg_path}")
+        break
+    except requests.RequestException as e:
+        print(f"Error downloading NuGet package (attempt {attempt}): {e}")
+        if attempt < max_attempts:
+            wait = 2 ** attempt  # 2s, 4s exponential backoff
+            print(f"Retrying in {wait}s...")
+            time.sleep(wait)
+        else:
+            print("ERROR: All download attempts exhausted.")
+            sys.exit(1)
 
 extract_folder = f"workspace/{nuget_name}"
 os.makedirs(extract_folder, exist_ok=True)

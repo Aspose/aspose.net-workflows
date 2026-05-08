@@ -3,6 +3,7 @@ import sys
 import os
 import shutil
 import subprocess
+import time
 import zipfile
 import urllib.request
 
@@ -32,12 +33,22 @@ def download_and_extract_docfx():
     print(f"Downloading DocFX from {DOCFX_DOWNLOAD_URL}...")
     zip_path = os.path.join(WORKSPACE_DIR, "docfx.zip")
     
-    try:
-        urllib.request.urlretrieve(DOCFX_DOWNLOAD_URL, zip_path)
-        print("DocFX download complete.")
-    except Exception as e:
-        print(f"ERROR: Failed to download DocFX: {e}")
-        sys.exit(1)
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            print(f"Downloading DocFX (attempt {attempt}/{max_attempts})...")
+            urllib.request.urlretrieve(DOCFX_DOWNLOAD_URL, zip_path)
+            print("DocFX download complete.")
+            break
+        except Exception as e:
+            print(f"ERROR: Download attempt {attempt} failed: {e}")
+            if attempt < max_attempts:
+                wait = 2 ** attempt  # 2s, 4s exponential backoff
+                print(f"Retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                print("ERROR: All download attempts exhausted.")
+                sys.exit(1)
 
     try:
         with zipfile.ZipFile(zip_path, "r") as zip_ref:

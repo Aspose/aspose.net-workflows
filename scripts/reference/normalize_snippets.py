@@ -329,11 +329,12 @@ def normalize_content(content: str):
             # Class 1: any non-empty line has >= 40 leading spaces (massive indent artifact)
             if any(len(l) - len(l.lstrip(' ')) >= 40 for l in original_lines if l.strip()):
                 defects.append(1)
-            # Class 1b: orphan deep-indent block (contiguous lines with indent >= 30
-            # while surrounding code is much shallower); independent of Class 1 —
-            # a fence may trigger both (e.g. common indent >= 40 AND an orphan block).
-            if any(len(l) - len(l.lstrip(' ')) >= _ORPHAN_BLOCK_THRESHOLD
-                   for l in original_lines if l.strip()):
+            # Class 1b: orphan deep-indent block — requires structural contrast: at least one
+            # non-empty line below _ORPHAN_BLOCK_THRESHOLD AND at least one at or above it.
+            # A fence where ALL lines are uniformly deep is purely Class 1; no 1b noise.
+            # Invariant: min_indent < threshold <= max_indent
+            _1b_indents = [len(l) - len(l.lstrip(' ')) for l in original_lines if l.strip()]
+            if _1b_indents and min(_1b_indents) < _ORPHAN_BLOCK_THRESHOLD <= max(_1b_indents):
                 defects.append('1b')
             # Class 2: tab characters present
             if '\t' in body:
@@ -625,6 +626,9 @@ def scan_directory(root: str, dry_run: bool, lang: str = None,
                         f.write(new_content)
                 except Exception as e:
                     print(f'[ERROR] Could not write {fpath}: {e}')
+
+    if llm and llm_sent == 0 and not os.environ.get('LLM_ENDPOINT', '').strip():
+        print('[WARN] --llm flag was set but LLM_ENDPOINT is not configured. LLM scanner inactive.')
 
     verb = 'that would change' if dry_run else 'changed'
     print(f'\n{"="*72}')

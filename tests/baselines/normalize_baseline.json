@@ -1,0 +1,10 @@
+{
+  "_description": "Baseline defect counts. Update when intentional content changes expected.",
+  "_seeded_from": "April 18 pre-fix run (generator run 24605952375)",
+  "_updated": "2026-05-08",
+  "defect_counts": {
+    "1": 988,
+    "1b": 1,
+    "5": 1
+  }
+}

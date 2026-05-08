@@ -254,6 +254,31 @@ class TestNormalizeContent:
         assert 1 in defects
         assert '1b' in defects
 
+    def test_uniform_deep_indent_class1_only_not_1b(self):
+        """G-A regression guard: fence where ALL non-empty lines are at >= 40 spaces
+        (fresh DocFX all-lines-deep pattern) must classify as Class 1 only, not 1b.
+
+        Root cause of May 1 production issue: 'any(indent >= 30)' fired on every
+        Class 1 fence, inflating Class 1b from 1 (true orphan blocks) to 989 (noise)
+        in the Words family report.
+
+        The fix (min/max contrast): Class 1b requires min_indent < threshold <= max_indent.
+        When all lines are at 72 spaces (including line 0), min=max=72, 72 < 30 is false
+        so no 1b.
+        """
+        deep = ' ' * 72
+        # All lines INCLUDING line 0 are at 72 spaces — production DocFX output shape
+        content = f'```csharp\n{deep}MethodSig()\n{deep}body1\n{deep}body2\n```'
+        _, changes = normalize_content(content)
+        fence_changes = [c for c in changes if c.get('type') != 'prose']
+        assert len(fence_changes) == 1, 'Expected one fence change'
+        defects = fence_changes[0]['defect_classes']
+        assert 1 in defects, 'Expected Class 1 (uniform deep indent)'
+        assert '1b' not in defects, (
+            'Class 1b must not fire when all lines are at uniform deep indent '
+            '(structural contrast required: min_indent < threshold <= max_indent)'
+        )
+
 
 # ---------------------------------------------------------------------------
 # _decode_prose_entities() tests (Defect Class 5)
