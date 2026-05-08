@@ -1,8 +1,8 @@
 {
-  "scan_id": "20260507-062931",
-  "content_sha": "639df92fc79a5a8039089e87862cc7c41df6985d",
-  "previous_sha": "b8af284373cc68fd4ef99cb0982699f45b268b69",
-  "detected_at": "2026-05-07T06:29:31.363128+00:00",
+  "scan_id": "20260508-fixes",
+  "content_sha": "39664dfbc9a55eb18470272bd1b53e370f77007f",
+  "previous_sha": "639df92fc79a5a8039089e87862cc7c41df6985d",
+  "detected_at": "2026-05-08T00:00:00.000000+00:00",
   "global_change": false,
   "affected_workflows": [
     "about.aspose.net.yml",
@@ -39,7 +39,6 @@
     "products.aspose.net-words.yml",
     "products.aspose.net-zip.yml",
     "reference.aspose.net-barcode.yml",
-    "reference.aspose.net-cad.yml",
     "reference.aspose.net-cells.yml",
     "reference.aspose.net-email.yml",
     "reference.aspose.net-home.yml",
