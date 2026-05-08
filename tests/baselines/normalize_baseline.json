@@ -1,10 +1,11 @@
 {
-  "_description": "Baseline defect counts. Update when intentional content changes expected.",
-  "_seeded_from": "April 18 pre-fix run (generator run 24605952375)",
+  "_description": "Baseline defect counts. Update when intentional classifier or content changes expected.",
+  "_seeded_from": "May 8 generator dry-run, Words 26.5.0, min/max contrast classifier (run 25566533975)",
+  "_classifier_note": "Baseline raised from 1b:1 to 1b:989 after TASK-10 classifier change. The old elif classifier skipped 1b when Class 1 fired; the new min/max contrast classifier fires both on mixed-indent fences. 989 is correct for Words 26.5.0 fresh DocFX output.",
   "_updated": "2026-05-08",
   "defect_counts": {
     "1": 988,
-    "1b": 1,
+    "1b": 989,
     "5": 1
   }
 }
