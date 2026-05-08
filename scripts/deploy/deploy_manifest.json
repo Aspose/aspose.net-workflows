@@ -1,7 +1,7 @@
 {
-  "scan_id": "20260508-fixes-5",
-  "content_sha": "36841a81f7b7e2d85bb67e2ffc33c8f82e71d7e7",
-  "previous_sha": "f777107dcbe79cfd5f0e30a08dd8b706c33d1ac9",
+  "scan_id": "20260508-fixes-6",
+  "content_sha": "131e3e8cfa8367efa87df2b7eee602f300e91404",
+  "previous_sha": "36841a81f7b7e2d85bb67e2ffc33c8f82e71d7e7",
   "detected_at": "2026-05-08T05:51:32.389802+00:00",
   "global_change": false,
   "affected_workflows": [
