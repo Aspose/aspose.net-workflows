@@ -140,7 +140,7 @@ jobs:
               python scripts/reference/normalize_snippets.py workspace/docfx/api --report normalize-report.json --llm
               if ($LASTEXITCODE -ne 0) { exit 1 }
               if (Test-Path "normalize-report.json") {
-                  python tests/check_report_anomaly.py normalize-report.json
+                  python tests/check_report_anomaly.py normalize-report.json --family "${{ matrix.family.family }}"
                   if ($LASTEXITCODE -ne 0) { exit 1 }
               }
           }

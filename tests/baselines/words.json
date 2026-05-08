@@ -1,0 +1,11 @@
+{
+  "_description": "Baseline defect counts for Aspose.Words generator runs.",
+  "_seeded_from": "May 8 generator dry-run, Words 26.5.0, min/max contrast classifier (run 25566810824)",
+  "_classifier_note": "min/max contrast classifier (TASK-10). Both Class 1 and 1b can fire simultaneously on mixed-indent fences. 989 is expected for Words 26.5.0 fresh DocFX output after postprocessor.",
+  "_updated": "2026-05-08",
+  "defect_counts": {
+    "1": 988,
+    "1b": 989,
+    "5": 1
+  }
+}
