@@ -20,6 +20,7 @@
     "reference.aspose.net-slides.yml",
     "reference.aspose.net-svg.yml"
   ],
-  "staging_status": "pending",
-  "production_status": "pending"
+  "staging_status": "completed",
+  "production_status": "completed",
+  "completed_at": "2026-05-09T07:41:23.814534+00:00"
 }
