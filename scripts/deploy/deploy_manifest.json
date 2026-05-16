@@ -1,14 +1,27 @@
 {
-  "scan_id": "20260515-065013",
-  "content_sha": "154b361e433b60c321f09d0e4d09bb9622466e1d",
-  "previous_sha": "3ab86faec5892377fe92c5227a2663519b466b54",
-  "detected_at": "2026-05-15T06:50:13.795523+00:00",
+  "scan_id": "20260516-061530",
+  "content_sha": "ae99136f4f89fe096605183bc1ce6eb40f252f50",
+  "previous_sha": "154b361e433b60c321f09d0e4d09bb9622466e1d",
+  "detected_at": "2026-05-16T06:15:30.817025+00:00",
   "global_change": false,
   "affected_workflows": [
+    "blog.aspose.net.yml",
+    "docs.aspose.net-home.yml",
+    "kb.aspose.net-home.yml",
+    "products.aspose.net-home.yml",
+    "reference.aspose.net-barcode.yml",
+    "reference.aspose.net-cad.yml",
+    "reference.aspose.net-cells.yml",
+    "reference.aspose.net-email.yml",
     "reference.aspose.net-home.yml",
-    "reference.aspose.net-words.yml"
+    "reference.aspose.net-imaging.yml",
+    "reference.aspose.net-medical.yml",
+    "reference.aspose.net-ocr.yml",
+    "reference.aspose.net-page.yml",
+    "reference.aspose.net-tex.yml",
+    "reference.aspose.net-zip.yml",
+    "websites.aspose.net.yml"
   ],
-  "staging_status": "completed",
-  "production_status": "completed",
-  "completed_at": "2026-05-15T07:02:15.153053+00:00"
+  "staging_status": "pending",
+  "production_status": "pending"
 }
