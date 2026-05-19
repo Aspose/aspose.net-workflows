@@ -1,8 +1,8 @@
 {
-  "scan_id": "20260518-075425",
-  "content_sha": "623864629787208f0e10cdaab9b52fd875691f1c",
+  "scan_id": "20260519-073624",
+  "content_sha": "d1a99b633a00a7c6fa49e4fa3494286df3d2b93f",
   "previous_sha": "154b361e433b60c321f09d0e4d09bb9622466e1d",
-  "detected_at": "2026-05-18T07:54:25.424572+00:00",
+  "detected_at": "2026-05-19T07:36:24.532006+00:00",
   "global_change": false,
   "affected_workflows": [
     "blog.aspose.net.yml",
