@@ -1,8 +1,8 @@
 {
-  "scan_id": "20260520-073527",
-  "content_sha": "d1cedd137de439e6c273121199acd7b0487a425e",
+  "scan_id": "20260521-074127",
+  "content_sha": "62eaa06d0adfab880dc054d77ab881e9c4ea5c2f",
   "previous_sha": "154b361e433b60c321f09d0e4d09bb9622466e1d",
-  "detected_at": "2026-05-20T07:35:27.366428+00:00",
+  "detected_at": "2026-05-21T07:41:27.543865+00:00",
   "global_change": false,
   "affected_workflows": [
     "blog.aspose.net.yml",
@@ -20,7 +20,8 @@
     "reference.aspose.net-page.yml",
     "reference.aspose.net-tex.yml",
     "reference.aspose.net-zip.yml",
-    "websites.aspose.net.yml"
+    "websites.aspose.net.yml",
+    "www.aspose.net.yml"
   ],
   "staging_status": "pending",
   "production_status": "pending"
