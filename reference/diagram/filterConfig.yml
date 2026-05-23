@@ -1,0 +1,12 @@
+apiRules:
+  # 1) Include Aspose.Diagram.LowCode (and all types under that namespace)
+  - include:
+      uidRegex: '^(?:T:)?Aspose\.Diagram\.LowCode(?:$|\..+)'
+
+  # 2) Include the four top-level classes in Aspose.Diagram
+  - include:
+      uidRegex: '^(?:T:)?Aspose\.Diagram\.(?:Metered)(?:$|\..+)'
+
+  # 3) Exclude everything else
+  - exclude:
+      uidRegex: '.*'
