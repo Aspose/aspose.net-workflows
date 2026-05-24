@@ -33,17 +33,26 @@ jobs:
           echo "trigger_time=$TRIGGER_TIME" >> $GITHUB_OUTPUT
 
           readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
+          ACTIVE_WFS=()
           for wf in "${WF_ARRAY[@]}"; do
+            STATE=$(gh api "repos/${GH_REPO}/actions/workflows/${wf}" --jq '.state' 2>/dev/null || echo "unknown")
+            if [ "$STATE" != "active" ]; then
+              echo "  -> SKIPPED $wf (state: $STATE)"
+              continue
+            fi
             echo "Triggering staging: $wf"
             gh workflow run "$wf" --field environment=staging \
               || { echo "FATAL: Failed to trigger $wf — aborting"; exit 1; }
             echo "  -> Triggered OK"
+            ACTIVE_WFS+=("$wf")
             sleep 5
           done
+          ACTIVE_JSON=$(printf '%s\n' "${ACTIVE_WFS[@]}" | jq -R . | jq -sc .)
+          echo "active_workflows=$ACTIVE_JSON" >> $GITHUB_OUTPUT
 
       - name: Wait for all staging runs to complete
         env:
-          WORKFLOWS: ${{ github.event.inputs.workflows }}
+          WORKFLOWS: ${{ steps.trigger_staging.outputs.active_workflows }}
           TRIGGER_TIME: ${{ steps.trigger_staging.outputs.trigger_time }}
         run: |
           set -eo pipefail
@@ -121,17 +130,26 @@ jobs:
           echo "trigger_time=$TRIGGER_TIME" >> $GITHUB_OUTPUT
 
           readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
+          ACTIVE_WFS=()
           for wf in "${WF_ARRAY[@]}"; do
+            STATE=$(gh api "repos/${GH_REPO}/actions/workflows/${wf}" --jq '.state' 2>/dev/null || echo "unknown")
+            if [ "$STATE" != "active" ]; then
+              echo "  -> SKIPPED $wf (state: $STATE)"
+              continue
+            fi
             echo "Triggering production: $wf"
             gh workflow run "$wf" --field environment=production \
               || { echo "FATAL: Failed to trigger $wf — aborting"; exit 1; }
             echo "  -> Triggered OK"
+            ACTIVE_WFS+=("$wf")
             sleep 5
           done
+          ACTIVE_JSON=$(printf '%s\n' "${ACTIVE_WFS[@]}" | jq -R . | jq -sc .)
+          echo "active_workflows=$ACTIVE_JSON" >> $GITHUB_OUTPUT
 
       - name: Wait for all production runs to complete
         env:
-          WORKFLOWS: ${{ github.event.inputs.workflows }}
+          WORKFLOWS: ${{ steps.trigger_production.outputs.active_workflows }}
           TRIGGER_TIME: ${{ steps.trigger_production.outputs.trigger_time }}
         run: |
           set -eo pipefail
