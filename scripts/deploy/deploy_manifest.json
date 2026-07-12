@@ -1,8 +1,8 @@
 {
-  "scan_id": "20260711-060643",
-  "content_sha": "6dd402a02afa80df292dcb3378694267c93bf1e3",
+  "scan_id": "20260712-062544",
+  "content_sha": "f0d847d102b572400ad50f8d8a4685aefc573607",
   "previous_sha": "154b361e433b60c321f09d0e4d09bb9622466e1d",
-  "detected_at": "2026-07-11T06:06:43.409687+00:00",
+  "detected_at": "2026-07-12T06:25:44.628480+00:00",
   "global_change": true,
   "affected_workflows": [
     "about.aspose.net.yml",
