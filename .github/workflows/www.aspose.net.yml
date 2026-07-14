@@ -32,12 +32,6 @@ jobs:
           fi
       - name: Build WWW
         run: hugo --config "./configs/www.aspose.net.toml" -b "${{ env.url }}" --cleanDestinationDir --minify --templateMetrics --templateMetricsHints --enableGitInfo
-      - name: Deploy WWW to S3
-        run: hugo deploy --config "configs/www.aspose.net.toml" --maxDeletes=-1 --target "${{ github.event.inputs.environment }}" --invalidateCDN --force
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
-
       - name: Deploy to Ceph (staging only)
         if: ${{ github.event.inputs.environment == 'staging' }}
         env:

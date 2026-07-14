@@ -75,17 +75,6 @@ jobs:
             --minify
 
       # 8) Deploy to S3 quietly
-      - name: Deploy Aspose.Imaging to S3
-        run: |
-          hugo deploy --quiet \
-            --config "configs/reference.aspose.net/imaging.toml" \
-            --maxDeletes=-1 \
-            --target "${{ github.event.inputs.environment }}" \
-            --force
-        env:
-          AWS_ACCESS_KEY_ID:     ${{ secrets.ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
-
       - name: Deploy to Ceph (staging only)
         if: ${{ github.event.inputs.environment == 'staging' }}
         run: hugo deploy --config "configs/reference.aspose.net/imaging.toml" --target "staging_ceph" --force

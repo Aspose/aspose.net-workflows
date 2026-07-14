@@ -32,11 +32,6 @@ jobs:
         fi
     - name: Build Aspose.Slides
       run: hugo --config "./configs/docs.aspose.net/slides.toml" -b "${{ steps.base-url.outputs.url }}" --cleanDestinationDir --minify --templateMetrics --templateMetricsHints --enableGitInfo
-    - name: Deploy Aspose.Slides to S3
-      run: hugo deploy --config "configs/docs.aspose.net/slides.toml" --maxDeletes=-1 --target "${{ github.event.inputs.environment }}" --force
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
     - name: Deploy Aspose.Slides to Ceph (staging only)
       if: ${{ github.event.inputs.environment == 'staging' }}
       run: hugo deploy --config "configs/docs.aspose.net/slides.toml" --target "staging_ceph" --force

@@ -32,11 +32,6 @@ jobs:
         fi
     - name: Build Aspose.html
       run: hugo --config "./configs/docs.aspose.net/html.toml" -b "${{ steps.base-url.outputs.url }}" --cleanDestinationDir --minify --templateMetrics --templateMetricsHints --enableGitInfo
-    - name: Deploy Aspose.html to S3
-      run: hugo deploy --config "configs/docs.aspose.net/html.toml" --maxDeletes=-1 --target "${{ github.event.inputs.environment }}" --force
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS }}
     - name: Deploy to Ceph (staging only)
       if: ${{ github.event.inputs.environment == 'staging' }}
       env:
