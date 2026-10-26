@@ -1,16 +1,61 @@
 name: gsc-query-collector
 
+# TC-SYS-131 (aspose.net SEO keyword program, Stage 2): the collector
+# script this workflow calls (Aspose/aspose.net scripts/google/
+# query-collector.py) was upgraded at TC-SYS-108 to emit a richer
+# `queries[]` list per page (clicks, impressions, ctr, position, sorted
+# by impressions, with a --min-impressions filter) alongside the
+# existing legacy `keywords[]` list, which it still writes for backward
+# compatibility -- no change needed here for that alone, since --subdomain
+# and --base-dir are unchanged and checkout@v3 always pulls the current
+# aspose.net main (which now has the upgrade).
+#
+# What THIS change adds: an optional `canary_subdomain` manual-dispatch
+# input that restricts a run to exactly one subdomain, so the new
+# collector's real output can be verified in production for one site
+# before relying on the full five-site scheduled run. Leaving the input
+# blank (including every scheduled run, which never sets it) preserves
+# the exact original five-site behavior unchanged.
+
 on:
   schedule:
     - cron: '0 0 * * 0' # Run every Sunday at 00:00
   workflow_dispatch:
+    inputs:
+      canary_subdomain:
+        description: 'Canary: restrict this run to one subdomain (leave blank for all five)'
+        required: false
+        type: choice
+        default: ''
+        options:
+          - ''
+          - docs.aspose.net
+          - blog.aspose.net
+          - kb.aspose.net
+          - reference.aspose.net
+          - products.aspose.net
 
 jobs:
+  determine_matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      subdomains: ${{ steps.set.outputs.subdomains }}
+    steps:
+      - name: Compute the subdomain list for this run
+        id: set
+        run: |
+          if [ -n "${{ github.event.inputs.canary_subdomain }}" ]; then
+            echo 'subdomains=["${{ github.event.inputs.canary_subdomain }}"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'subdomains=["docs.aspose.net","blog.aspose.net","kb.aspose.net","reference.aspose.net","products.aspose.net"]' >> "$GITHUB_OUTPUT"
+          fi
+
   update_queries:
+    needs: determine_matrix
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        subdomain: [ "docs.aspose.net", "blog.aspose.net", "kb.aspose.net", "reference.aspose.net", "products.aspose.net" ]
+        subdomain: ${{ fromJson(needs.determine_matrix.outputs.subdomains) }}
     env:
       GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
     steps:
