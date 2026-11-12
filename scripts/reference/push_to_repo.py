@@ -90,6 +90,19 @@ try:
         name for name in os.listdir(SOURCE_PATH)
         if os.path.isfile(os.path.join(SOURCE_PATH, name))
     }
+
+    # Safety guard: never prune the family's namespace index page unless a fresh one is
+    # actually about to replace it. Discovered live: a family-name casing mismatch in
+    # postprocessor.py's rename_file() (e.g. "Aspose.PDF" vs the DocFX-generated
+    # "Aspose.Pdf.md") can silently fail to produce "_index.md" in SOURCE_PATH at all,
+    # which would otherwise delete the site's only landing page for that family with
+    # nothing to put back. Fail loudly instead of shipping a missing index page.
+    if os.path.exists(os.path.join(DEST_PATH, "_index.md")) and "_index.md" not in fresh_names:
+        print("ERROR: Fresh DocFX output has no _index.md, but the destination has one. "
+              "Refusing to delete the family's namespace index page -- this usually means "
+              "rename_file()'s family-name match failed in postprocessor.py. Not pushing.")
+        sys.exit(1)
+
     removed = []
     for existing in os.listdir(DEST_PATH):
         existing_path = os.path.join(DEST_PATH, existing)

@@ -437,7 +437,12 @@ def update_frontmatter(content, layout_value):
 # Define a mapping for special cases where the .md filename does not match the expected family name
 FAMILY_NAME_MAPPING = {
     "Aspose.HTML": "Aspose.Html",  # Aspose.HTML should match Aspose.Html.md
-    "Aspose.SVG": "Aspose.Svg"
+    "Aspose.SVG": "Aspose.Svg",
+    "Aspose.PDF": "Aspose.Pdf",  # Aspose.PDF should match Aspose.Pdf.md (DocFX uses the .NET
+                                 # namespace's own casing, not the NuGet package id's casing).
+                                 # Confirmed broken before this fix: rename_file() never matched,
+                                 # so the stale _index.md was never refreshed (masked by the old
+                                 # push_to_repo.py, which never deleted it -- see TC-SYS-159).
 }
 
 def rename_file():
