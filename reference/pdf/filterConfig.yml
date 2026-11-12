@@ -1,16 +1,19 @@
 apiRules:
-  # 1. Allow everything in Aspose.Pdf.Plugins (all classes, interfaces, enums, and their members)
+  # Aspose.Pdf.Plugins was renamed to Aspose.Pdf.LowCode in Aspose.PDF 25.9; confirmed via
+  # reflection over the real NuGet package (aspose.net repo, ops/knowledge/pdf/plugin-surface.json,
+  # TC-SYS-157/159) that Aspose.Pdf.Plugins (99 types) exists only in 25.8.0, and
+  # Aspose.Pdf.LowCode (111 types, 22 IPlugin implementers) is what 26.8.0/26.10.0 actually ship.
+  # Pattern matches the already-working words/diagram/cells filterConfig.yml for this exact
+  # kind of namespace migration.
+
+  # 1. Include complete Aspose.Pdf.LowCode namespace (all classes, interfaces, enums, and their members)
   - include:
-      uidRegex: "^(?:T:)?Aspose\\.Pdf\\.Plugins(?:$|\\..+)"
-  
+      uidRegex: "^(?:T:)?Aspose\\.Pdf\\.LowCode(?:$|\\..+)"
+
   # 2. Include Aspose.Pdf.Document and Aspose.Pdf.Metered
   - include:
       uidRegex: "^(?:T:)?Aspose\\.Pdf\\.(Document|Metered)(?:$|\\..+)"
-  
-  # 3. Exclude Aspose.JavaDeleteAttribute and Aspose.JavaManualAttribute (and their members)
+
+  # 3. Exclude everything else
   - exclude:
-      uidRegex: "^(?:T:)?Aspose\\.(?:JavaDeleteAttribute|JavaManualAttribute)(\\.|$)"
-      
-  # 4. Exclude everything else under Aspose.Pdf and Aspose.Foundation.UriResolver
-  - exclude:
-      uidRegex: "^(?:T:)?(?:Aspose\\.Foundation\\.UriResolver|Aspose\\.Pdf)(?:$|\\..+)"
+      uidRegex: ".*"
