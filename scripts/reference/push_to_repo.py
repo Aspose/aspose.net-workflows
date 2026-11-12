@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -73,10 +74,38 @@ except subprocess.CalledProcessError:
 print(f"DEBUG: Copying updated API files to '{DEST_PATH}'...")
 os.makedirs(DEST_PATH, exist_ok=True)
 
+SOURCE_PATH = "workspace/docfx/api"
+
 try:
-    subprocess.run(["cp", "-r", "workspace/docfx/api/.", DEST_PATH], check=True)
-except subprocess.CalledProcessError:
-    print("ERROR: Failed to copy API files.")
+    # Pure-Python copy+prune so this works identically on the windows-latest runner
+    # (no reliance on rsync, which isn't guaranteed present there).
+    #
+    # Prune first: a page that existed before but is no longer produced by DocFX
+    # (e.g. a namespace dropped from filterConfig.yml, such as the Aspose.Pdf.Plugins ->
+    # Aspose.Pdf.LowCode migration) must not linger forever. The old `cp -r` here only
+    # ever added/overwrote files and never deleted, which is why pdf's old
+    # Aspose.Pdf.Plugins.*.md pages stayed frozen long after that namespace stopped
+    # being generated (see TC-SYS-159 in Aspose/aspose.net for the investigation).
+    fresh_names = {
+        name for name in os.listdir(SOURCE_PATH)
+        if os.path.isfile(os.path.join(SOURCE_PATH, name))
+    }
+    removed = []
+    for existing in os.listdir(DEST_PATH):
+        existing_path = os.path.join(DEST_PATH, existing)
+        if os.path.isfile(existing_path) and existing.endswith(".md") and existing not in fresh_names:
+            os.remove(existing_path)
+            removed.append(existing)
+    if removed:
+        print(f"DEBUG: Removed {len(removed)} stale page(s) no longer produced by DocFX: {removed[:10]}{'...' if len(removed) > 10 else ''}")
+
+    for name in os.listdir(SOURCE_PATH):
+        src = os.path.join(SOURCE_PATH, name)
+        dst = os.path.join(DEST_PATH, name)
+        if os.path.isfile(src):
+            shutil.copy2(src, dst)
+except OSError as e:
+    print(f"ERROR: Failed to copy API files: {e}")
     sys.exit(1)
 
 # Change directory to cloned repo
