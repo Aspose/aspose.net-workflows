@@ -83,13 +83,8 @@ jobs:
 
       - name: Commit and push changes for ${{ matrix.subdomain }}
         working-directory: checked_out_repo
+        env:
+          MAX_ATTEMPTS: "6"
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          # Explicitly update remote URL in case of caching
-          git remote set-url origin https://github.com/Aspose/aspose.net.git
-          # Pull latest changes to avoid conflicts
-          git pull --rebase --autostash origin main
-          git add keywords/
-          git diff --cached --quiet || git commit -m "Update queries for ${{ matrix.subdomain }}"
-          git push origin main || echo "Push failed due to concurrent update. Consider handling merge conflicts."
+          # TC-SYS-152: retries the push on a concurrent-leg race and fails the step if it never lands
+          bash scripts/google/commit-and-push-keywords.sh "${{ matrix.subdomain }}"
