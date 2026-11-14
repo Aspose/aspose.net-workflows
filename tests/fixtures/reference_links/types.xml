@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<doc>
+  <members>
+    <member name="T:Aspose.Pdf.ConvertErrorAction">
+    </member>
+    <member name="T:Aspose.Pdf.ConvertSoftMaskAction">
+    </member>
+    <member name="T:Aspose.Pdf.Document">
+    </member>
+    <member name="T:Aspose.Pdf.FontEmbeddingOptions">
+    </member>
+    <member name="T:Aspose.Pdf.Forms.Form">
+    </member>
+    <member name="T:Aspose.Pdf.Forms.Form.FlattenSettings">
+    </member>
+    <member name="T:Aspose.Pdf.LowCode.IDataSource">
+    </member>
+    <member name="T:Aspose.Pdf.LowCode.IPluginOptions">
+    </member>
+    <member name="T:Aspose.Pdf.LowCode.PdfAConvertOptions">
+    </member>
+    <member name="T:Aspose.Pdf.LowCode.PdfAOptionsBase">
+    </member>
+    <member name="T:Aspose.Pdf.LowCode.PdfAStandardVersion">
+    </member>
+    <member name="T:Aspose.Pdf.LowCode.PdfAValidateOptions">
+    </member>
+    <member name="T:Aspose.Pdf.PdfANonSpecificationFlags">
+    </member>
+    <member name="T:Aspose.Pdf.PdfASymbolicFontEncodingStrategy">
+    </member>
+    <member name="T:Aspose.Pdf.PdfFormatConversionOptions">
+    </member>
+    <member name="T:Aspose.Pdf.PdfFormatConversionOptions.PuaProcessingStrategy">
+    </member>
+    <member name="T:Aspose.Pdf.PdfFormatConversionOptions.RemoveFontsStrategy">
+    </member>
+    <member name="T:Aspose.Pdf.ToUnicodeProcessingRules">
+    </member>
+  </members>
+</doc>

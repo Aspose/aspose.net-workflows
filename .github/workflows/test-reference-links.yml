@@ -1,0 +1,38 @@
+name: test-reference-links
+
+# Unit tests for the reference link rewriting (scripts/reference/link_fixer.py, repair_links.py and its
+# wiring in postprocessor.py). Pure unit tests on real page fixtures: no DocFX, no NuGet, no network.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/reference/link_fixer.py'
+      - 'scripts/reference/repair_links.py'
+      - 'scripts/reference/postprocessor.py'
+      - 'tests/test_reference_postprocessor.py'
+      - 'tests/fixtures/reference_links/**'
+      - '.github/workflows/test-reference-links.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/reference/link_fixer.py'
+      - 'scripts/reference/repair_links.py'
+      - 'scripts/reference/postprocessor.py'
+      - 'tests/test_reference_postprocessor.py'
+      - 'tests/fixtures/reference_links/**'
+      - '.github/workflows/test-reference-links.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install test dependencies
+        run: pip install pytest beautifulsoup4
+      - name: Run reference link tests
+        run: python -m pytest tests/test_reference_postprocessor.py -v

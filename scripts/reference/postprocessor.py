@@ -2,11 +2,14 @@
 
 import sys
 import os
+import glob
 import re
 import textwrap
 import html as html_module
 from bs4 import BeautifulSoup
 from urllib.parse import unquote
+
+import link_fixer  # sibling module; scripts/reference is sys.path[0] when this file is run as a script
 
 # Check if the folder path is provided
 if len(sys.argv) < 2:
@@ -30,34 +33,65 @@ for filename in os.listdir(folder_path):
 # Clean the family name
 family = family_name.replace("Aspose.", "").lower()  # "Aspose.Words" → "words"
 
+# Anchored-link repair applies to every family. The extra link repairs below are opt-in per family because
+# they change output beyond the anchored-link fix: links to pages the DocFX filter did not generate (for example
+# core types referenced from a LowCode page) go to reference.aspose.com, links to the family overview page go to
+# the family root, and markdown escapes are removed from absolute URLs (list\-1). Set
+# REFERENCE_LINK_REPAIR_FAMILIES=pdf,words to widen the set (default: pdf).
+LINK_REPAIR_FAMILIES = {
+    f.strip().lower()
+    for f in os.environ.get("REFERENCE_LINK_REPAIR_FAMILIES", "pdf").split(",")
+    if f.strip()
+}
+
+_link_context = None
+
+
+def _get_link_context():
+    """(existing page slugs, TypeIndex or None, overview slug), computed once when the first page is processed."""
+    global _link_context
+    if _link_context is None:
+        # The family overview page (e.g. Aspose.Pdf.md) is renamed to _index.md: it is the family root, not a slug.
+        overview = FAMILY_NAME_MAPPING.get(family_name, family_name).lower()
+        pages = {f[:-3].lower() for f in os.listdir(folder_path) if f.endswith(".md")} - {overview, "_index"}
+        xml_dir = os.path.dirname(folder_path)  # workspace/docfx (generate_docfx.py copies the package XML there)
+        xml_files = sorted(glob.glob(os.path.join(xml_dir, "*.xml")))
+        type_index = None
+        if xml_files:
+            xml_text = "".join(open(x, encoding="utf-8", errors="replace").read() for x in xml_files)
+            type_index = link_fixer.TypeIndex.from_xml_text(xml_text)
+        elif family in LINK_REPAIR_FAMILIES:
+            print("Warning: no package XML found next to workspace/docfx/api; links to missing pages cannot be resolved.")
+        _link_context = (pages, type_index, overview)
+    return _link_context
+
+
 def process_internal_links(content):
-    """Processes internal markdown links:
+    """Processes internal markdown links (see link_fixer.py):
        - Fix 'Namespace: [FamilyName](FamilyName.md)' before modifying other links.
-       - Convert internal links to lowercase.
-       - Remove .md extension.
-       - Inject the cleaned family name in the link path.
+       - Convert internal links, with or without an '#anchor', to lowercase family-relative URLs.
+       - Remove .md extension and inject the cleaned family name in the link path.
+       - For families in LINK_REPAIR_FAMILIES: links to pages that were not generated go to reference.aspose.com,
+         links to the overview page go to the family root, and backslash escapes for '-' and '_' are removed from absolute URLs.
     """
     try:
-        # ✅ STEP 1: Fix 'Namespace' links FIRST
-        content = re.sub(
-            rf'Namespace: \[{re.escape(family_name)}\]\(\s*{re.escape(family_name)}\.md\s*\)',
-            f'Namespace: [{family_name}](/{family}/)',
-            content
+        try:
+            pages, type_index, overview = _get_link_context()
+        except Exception as e:  # never let the optional link-repair context disable the basic link rewrite
+            print(f"Warning: could not build the link-repair context ({e}); only the basic link rewrite is applied.")
+            pages, type_index, overview = set(), None, None
+        return link_fixer.rewrite_internal_links(
+            content,
+            family,
+            family_name,
+            existing_pages=pages,
+            type_index=type_index,
+            overview_slug=overview,
+            repair_extra=family in LINK_REPAIR_FAMILIES,
         )
-
-        # ✅ STEP 2: Find and replace internal links (without https and ending with .md)
-        content = re.sub(
-            r'\[([^\]]+)\]\((?!https?://)([^)]+\.md)\)',
-            lambda m: f"[{m.group(1)}](/{family}/{m.group(2).lower().replace('.md', '').lstrip('/')})"
-            if not m.group(2).lower().startswith(family)  # Avoid redundant family names
-            else f"[{m.group(1)}](/" + m.group(2).lower().replace('.md', '').lstrip('/') + ")",
-            content
-        )
-
     except Exception as e:
         print(f"Error processing internal links: {e}")
-
-    return content
+        return content
 
 
 def extract_meta_info(file_content):
