@@ -1,47 +1,193 @@
 name: AST2MD Converter
 
+# Rebuilds the translated Markdown for a subdomain/family from the English source
+# plus the translation cache, then opens a pull request into Aspose/aspose.net.
+#
+# - Languages: every locale folder that exists next to .../<family>/en in
+#   Aspose/aspose.net (derived by scripts/ast-translator/list_locales.py), unless
+#   an explicit list is given. No hardcoded language list.
+# - Prune: for reference.aspose.net the converter also deletes locale pages that
+#   no longer exist in the English source (e.g. the retired Aspose.Pdf.Plugins.*
+#   pages), so stale translations do not linger.
+# - Delivery: the result goes to a branch + PR, never straight to main.
+#
+# Run AST Translator first so the translation cache contains the new strings.
+
 on:
   workflow_dispatch:
+    inputs:
+      subdomain:
+        description: "Target subdomain (e.g., reference.aspose.net)"
+        required: true
+        default: "reference.aspose.net"
+      families:
+        description: "Comma-separated list of families (e.g., pdf)"
+        required: true
+        default: "pdf"
+      languages:
+        description: "Comma-separated target languages, or 'auto' for every locale folder that exists for the family"
+        required: false
+        default: "auto"
+      prune:
+        description: "Delete locale pages that no longer exist in English: true | false | auto (auto = true for reference.aspose.net only)"
+        required: false
+        default: "auto"
+      dry_run:
+        description: "true = build and report only; do not create a branch or PR"
+        required: false
+        default: "false"
+  workflow_call:
+    inputs:
+      subdomain:
+        required: true
+        type: string
+      families:
+        required: true
+        type: string
+      languages:
+        required: false
+        type: string
+        default: "auto"
+      prune:
+        required: false
+        type: string
+        default: "auto"
+      dry_run:
+        required: false
+        type: string
+        default: "false"
+    secrets:
+      REPO_TOKEN:
+        required: true
 
 jobs:
   generate_markdown:
     name: Generate Markdown Files from AST
     runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SUBDOMAIN: ${{ inputs.subdomain }}
+      FAMILIES: ${{ inputs.families }}
+      LANGUAGES: ${{ inputs.languages }}
+      PRUNE: ${{ inputs.prune }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      GH_TOKEN: ${{ secrets.REPO_TOKEN }}
     steps:
       - name: Checkout Aspose/aspose.net Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: Aspose/aspose.net
           token: ${{ secrets.REPO_TOKEN }}
-          fetch-depth: 0
+          fetch-depth: 1
           path: aspose.net
 
       - name: Checkout Translation Cache Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: smallize/translationcache
           token: ${{ secrets.REPO_TOKEN }}
-          fetch-depth: 0
+          # Read-only here: only the latest cache files are needed.
+          fetch-depth: 1
           path: translationcache
 
-      - name: Run MD Creator Script
-        run: |
-          cd aspose.net
-          python scripts/ast-translator/ast2md-converter.py --input ast --target_languages "de,es,fr,ja,ko,ru,zh,ar,it,pt,pl,fa,id,cs,vi,tr,th,sv,el,uk" --cache_folder "${GITHUB_WORKSPACE}/translationcache" 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Commit and Push Markdown Changes
+      - name: Install dependencies
+        run: pip install mistune python-frontmatter beautifulsoup4 pyyaml
+
+      - name: Rebuild Markdown (AST -> translated Markdown) per family
+        shell: bash
         working-directory: aspose.net
         run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-          # Only add markdown files in the "content" folder
-          git add -f content/*.md
-          # Check if there are changes to commit
-          if ! git diff-index --quiet HEAD; then
-            git commit -m "Translation Creator: Updated markdown files"
-            git push origin HEAD
-          else
+          set -euo pipefail
+          REQUESTED="$(echo -n "${LANGUAGES:-auto}" | xargs)"
+          IFS=',' read -ra FAMS <<< "$FAMILIES"
+          for fam in "${FAMS[@]}"; do
+            fam="$(echo -n "$fam" | xargs)"
+            [ -z "$fam" ] && continue
+            src="content/${SUBDOMAIN}/${fam}"
+            [ -d "$src/en" ] || { echo "::error::No English source folder: $src/en"; exit 1; }
+
+            if [[ -z "$REQUESTED" || "$REQUESTED" == "auto" ]]; then
+              LANGS="$(python scripts/ast-translator/list_locales.py --content-root content --subdomain "$SUBDOMAIN" --family "$fam")"
+            else
+              LANGS="$REQUESTED"
+            fi
+            echo "== ${SUBDOMAIN}/${fam}: languages = ${LANGS}"
+
+            # 1. English source -> AST (deterministic, regenerated every run)
+            python scripts/ast-translator/ast-creator.py --input "$src"
+            count=$(find "ast/${SUBDOMAIN}/${fam}/en" -name '*.json' | wc -l)
+            echo "AST files: $count"
+            [ "$count" -gt 0 ] || { echo "::error::AST creator produced no files"; exit 1; }
+
+            # 2. AST + translation cache -> translated Markdown (+ prune stale pages)
+            PRUNE_ARGS=()
+            if [[ "$PRUNE" == "true" || ( "$PRUNE" == "auto" && "$SUBDOMAIN" == "reference.aspose.net" ) ]]; then
+              PRUNE_ARGS=(--prune)
+            fi
+            python scripts/ast-translator/ast2md-converter.py \
+              --input "ast/${SUBDOMAIN}/${fam}/en" \
+              --target_languages "$LANGS" \
+              --cache_folder "${GITHUB_WORKSPACE}/translationcache" \
+              "${PRUNE_ARGS[@]}"
+          done
+
+      - name: Create branch, commit and open a pull request
+        shell: bash
+        working-directory: aspose.net
+        run: |
+          set -euo pipefail
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+
+          # Stage only the generated trees (adds, edits AND deletions of pruned pages).
+          IFS=',' read -ra FAMS <<< "$FAMILIES"
+          for fam in "${FAMS[@]}"; do
+            fam="$(echo -n "$fam" | xargs)"
+            [ -z "$fam" ] && continue
+            git add -A -- "content/${SUBDOMAIN}/${fam}"
+          done
+
+          if git diff --cached --quiet; then
             echo "No changes to commit"
+            exit 0
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
+
+          # --no-renames: count a Plugins->LowCode page swap as 1 delete + 1 add
+          added=$(git diff --cached --no-renames --name-status | grep -c '^A' || true)
+          modified=$(git diff --cached --no-renames --name-status | grep -c '^M' || true)
+          deleted=$(git diff --cached --no-renames --name-status | grep -c '^D' || true)
+          echo "Staged: ${added} added, ${modified} modified, ${deleted} deleted"
+
+          if [[ "$DRY_RUN" == "true" ]]; then
+            echo "dry_run=true: not creating a branch or PR."
+            exit 0
+          fi
+
+          slug="$(echo "${SUBDOMAIN}-${FAMILIES}" | tr -c 'a-zA-Z0-9\n' '-' | sed 's/--*/-/g; s/-$//')"
+          # NOTE: must not start with 'api-update-' or 'optimizer-': the auto-merge
+          # workflow in Aspose/aspose.net merges those branches unattended.
+          BRANCH="ast2md-${slug}-$(date -u +%Y%m%d)-${GITHUB_RUN_ID}"
+          git checkout -b "$BRANCH"
+          git commit -m "Translation Creator: Updated markdown files for ${SUBDOMAIN} (${FAMILIES})" \
+                     -m "${added} added, ${modified} modified, ${deleted} deleted. Generated by AST2MD Converter run ${GITHUB_RUN_ID} from the English source and the translation cache."
+          git push origin "$BRANCH"
+
+          cat > "$RUNNER_TEMP/pr-body.md" <<EOF
+          Generated by the **AST2MD Converter** workflow (run ${GITHUB_RUN_ID}) in Aspose/aspose.net-workflows.
+
+          - Subdomain / families: \`${SUBDOMAIN}\` / \`${FAMILIES}\`
+          - Languages: ${LANGUAGES:-auto} (derived from the locale folders in the repo when \`auto\`)
+          - Prune stale locale pages: \`${PRUNE}\`
+          - Changes: **${added} added, ${modified} modified, ${deleted} deleted** files
+
+          Deleted files are locale pages with no English source any more (pruned). Review before merging; this PR is never auto-merged.
+          EOF
+
+          gh pr create --repo Aspose/aspose.net --base main --head "$BRANCH" \
+            --title "Translation Creator: ${SUBDOMAIN} (${FAMILIES}) locale pages" \
+            --body-file "$RUNNER_TEMP/pr-body.md"

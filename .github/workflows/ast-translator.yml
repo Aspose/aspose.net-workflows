@@ -12,9 +12,9 @@ on:
         required: true
         default: 'words,cells,barcode'
       languages:
-        description: "Comma-separated list of target languages (e.g., zh,es,fr)"
-        required: true
-        default: 'de,es,fr,ja,ko,ru,zh,ar,it,pt,pl,fa,id,cs,vi,tr,th,sv,el,uk'
+        description: "Comma-separated target languages (e.g., zh,es,fr), or 'auto' to use every locale folder that exists for the family in Aspose/aspose.net"
+        required: false
+        default: 'auto'
   workflow_call:
     inputs:
       subdomain:
@@ -24,8 +24,9 @@ on:
         required: true
         type: string
       languages:
-        required: true
+        required: false
         type: string
+        default: 'auto'
     secrets:
       REPO_TOKEN:
         required: true
@@ -36,24 +37,45 @@ jobs:
     outputs:
       matrix: ${{ steps.set_matrix.outputs.matrix }}
     steps:
+      - name: Checkout Aspose/aspose.net (to derive locales)
+        uses: actions/checkout@v4
+        with:
+          repository: Aspose/aspose.net
+          token: ${{ secrets.REPO_TOKEN }}
+          fetch-depth: 1
+
       - name: Convert families and languages inputs to JSON array of objects
         id: set_matrix
         shell: bash
         run: |
+          set -euo pipefail
           IFS=',' read -ra FAM_LIST <<< "${{ inputs.families }}"
-          IFS=',' read -ra LANG_LIST <<< "${{ inputs.languages }}"
+          REQUESTED="$(echo -n "${{ inputs.languages }}" | xargs)"
           elements=()
           for fam in "${FAM_LIST[@]}"; do
             fam="$(echo -n "$fam" | xargs)"
             if [[ -z "$fam" ]]; then continue; fi
+            if [[ -z "$REQUESTED" || "$REQUESTED" == "auto" ]]; then
+              # Derive from the repo: every locale folder next to .../<family>/en
+              LANGS="$(python3 scripts/ast-translator/list_locales.py --content-root content --subdomain "${{ inputs.subdomain }}" --family "$fam")"
+            else
+              LANGS="$REQUESTED"
+            fi
+            echo "Languages for ${fam}: ${LANGS}"
+            IFS=',' read -ra LANG_LIST <<< "$LANGS"
             for lang in "${LANG_LIST[@]}"; do
               lang="$(echo -n "$lang" | xargs)"
               if [[ -z "$lang" ]]; then continue; fi
               elements+=("{\"family\": \"${fam}\", \"language\": \"${lang}\"}")
             done
           done
+          if [[ ${#elements[@]} -eq 0 ]]; then
+            echo "::error::No family/language combinations to translate"
+            exit 1
+          fi
           json="[$(IFS=,; echo "${elements[*]}")]"
           echo "matrix=$json" >> $GITHUB_OUTPUT
+          echo "Matrix size: ${#elements[@]}"
 
   translate:
     name: Translate AST Files
@@ -68,15 +90,17 @@ jobs:
       contents: write
     steps:
       - name: Checkout aspose.net repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: Aspose/aspose.net
           path: aspose-net
           token: ${{ secrets.REPO_TOKEN }}
-          fetch-depth: 0
+          # Only the scripts and the English source are read here; the
+          # translation output goes to the translationcache repo.
+          fetch-depth: 1
 
       - name: Checkout translationcache repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: smallize/translationcache
           path: translationcache
@@ -84,14 +108,41 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install torch transformers sentencepiece
+          # CPU-only torch wheel (runners have no GPU; avoids multi-GB CUDA downloads)
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # accelerate is imported at module level by ast-translator.py
+          pip install transformers sentencepiece accelerate
+          # ast-creator.py dependencies (the AST is regenerated from content/ below)
+          pip install mistune python-frontmatter beautifulsoup4 pyyaml
+
+      - name: Generate AST from the English source
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="aspose-net/content/${{ inputs.subdomain }}/${{ matrix.family }}"
+          test -d "$src/en" || { echo "::error::No English source folder: $src/en"; exit 1; }
+          python aspose-net/scripts/ast-translator/ast-creator.py --input "$src"
+          count=$(find "aspose-net/ast/${{ inputs.subdomain }}/${{ matrix.family }}/en" -name '*.json' | wc -l)
+          echo "AST files: $count"
+          test "$count" -gt 0
+
+      - name: Extract translatable strings (nodes.txt)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ast-translator.py takes a text file of source strings, not an AST folder.
+          python aspose-net/scripts/ast-translator/ast-filter.py \
+            --input "aspose-net/ast/${{ inputs.subdomain }}/${{ matrix.family }}/en" --overwrite
+          lines=$(grep -c . aspose-net/scripts/ast-translator/nodes.txt || true)
+          echo "Translatable lines: $lines"
+          test "$lines" -gt 0
 
       - name: Configure Git Identity
         run: |
@@ -100,10 +151,17 @@ jobs:
 
       - name: Run AST Translation with Watchdog
         shell: bash
+        env:
+          # The translator wraps the model in torch.compile(max-autotune); on a CPU
+          # runner that compile time dwarfs a small incremental run. Disable it.
+          TORCHDYNAMO_DISABLE: "1"
         run: |
           # This step runs both the AST translation and a watchdog that monitors its runtime.
           START_TIME=$(date +%s)
           WATCHDOG_THRESHOLD=19800  # 5 hours 30 minutes in seconds
+          # Branch of the translationcache repo (NOT this workflow's own ref: the
+          # workflow may be dispatched from any branch of aspose.net-workflows).
+          TC_BRANCH="$(git -C translationcache rev-parse --abbrev-ref HEAD)"
 
           # Define the cleanup function to merge and push the partial cache.
           cleanup() {
@@ -121,14 +179,14 @@ jobs:
             # Perform Git operations in the translationcache repository.
             cd translationcache
             git fetch origin
-            git reset --hard origin/"${GITHUB_REF#refs/heads/}"
+            git reset --hard origin/"$TC_BRANCH"
             cd ..
             cd translationcache
             git add *.json
             # Updated commit message including subdomain, family, and language.
             commit_message="Watchdog commit for ${{ inputs.subdomain }}, family: ${{ matrix.family }}, language: ${{ matrix.language }} (Partial translation)"
             git commit -m "$commit_message" || echo "Nothing to commit"
-            if git push origin "${GITHUB_REF#refs/heads/}"; then
+            if git push origin "$TC_BRANCH"; then
               echo "Cleanup push successful."
             else
               echo "Cleanup push failed."
@@ -141,7 +199,7 @@ jobs:
           # Start the AST translation process in the background.
           echo "Starting AST translation for subdomain: ${{ inputs.subdomain }}, family: ${{ matrix.family }}, language: ${{ matrix.language }}..."
           python aspose-net/scripts/ast-translator/ast-translator.py \
-            --input "aspose-net/ast/${{ inputs.subdomain }}/${{ matrix.family }}/en" \
+            --input aspose-net/scripts/ast-translator/nodes.txt \
             --cache_folder aspose-net/translation \
             --device auto \
             --target_languages "${{ matrix.language }}" \
@@ -179,6 +237,7 @@ jobs:
             exit 0
           fi
           LANG="${{ matrix.language }}"
+          TC_BRANCH="$(git -C translationcache rev-parse --abbrev-ref HEAD)"
           echo "Final merge and push process starting for language: $LANG..."
           LOCAL_FILE="aspose-net/translation/${LANG}_cache.json"
           REMOTE_FILE="translationcache/${LANG}_cache.json"
@@ -194,7 +253,7 @@ jobs:
             echo "Final commit attempt #$attempt"
             cd translationcache
             git fetch origin
-            git reset --hard origin/"${GITHUB_REF#refs/heads/}"
+            git reset --hard origin/"$TC_BRANCH"
             cd ..
             python aspose-net/scripts/json-merger/merge.py --input1 "$REMOTE_FILE" --input2 "$LOCAL_FILE" --output "$REMOTE_FILE"
             python aspose-net/scripts/json-merger/validate.py --file "$REMOTE_FILE" --fix
@@ -202,7 +261,7 @@ jobs:
             git add *.json
             commit_message="Final translation cache commit for ${{ inputs.subdomain }}, family: ${{ matrix.family }}, language: $LANG"
             git commit -m "$commit_message" || echo "Nothing to commit"
-            if git push origin "${GITHUB_REF#refs/heads/}"; then
+            if git push origin "$TC_BRANCH"; then
               echo "Final push successful."
               exit 0
             else

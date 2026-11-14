@@ -1,0 +1,33 @@
+name: test-ast-workflows
+
+# Structural checks for the AST locale workflows (see tests/test_ast_workflows.py).
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/ast-creator.yml'
+      - '.github/workflows/ast-translator.yml'
+      - '.github/workflows/ast2md-converter.yml'
+      - 'tests/test_ast_workflows.py'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/ast-creator.yml'
+      - '.github/workflows/ast-translator.yml'
+      - '.github/workflows/ast2md-converter.yml'
+      - 'tests/test_ast_workflows.py'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install test dependencies
+        run: pip install pytest pyyaml
+      - name: Run workflow structure tests
+        run: python -m pytest tests/test_ast_workflows.py -v

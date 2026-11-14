@@ -1,5 +1,14 @@
 name: AST Creator
 
+# Builds the AST JSON for the English source of the given families and publishes
+# it as a workflow artifact.
+#
+# The AST is derived data (/ast is gitignored in Aspose/aspose.net), so it is NOT
+# committed or pushed. ast-translator and ast2md-converter regenerate it from
+# `content/` themselves, which keeps all three workflows deterministic and
+# independent of a previously pushed snapshot. Run this workflow to check that
+# the English source parses cleanly before starting a (slow) translation run.
+
 on:
   workflow_dispatch:
     inputs:
@@ -8,9 +17,9 @@ on:
         required: true
         default: "reference.aspose.net"
       families:
-        description: "Comma-separated list of families (e.g., words,cells,barcode)"
+        description: "Comma-separated list of families (e.g., pdf,words,cells)"
         required: true
-        default: "words,cells,barcode"
+        default: "pdf"
   workflow_call:
     inputs:
       subdomain:
@@ -27,30 +36,46 @@ jobs:
   create_ast:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout aspose/aspose.net Repository
-        uses: actions/checkout@v3
+      - name: Checkout Aspose/aspose.net Repository
+        uses: actions/checkout@v4
         with:
           repository: Aspose/aspose.net
           token: ${{ secrets.REPO_TOKEN }}
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Run AST Creator Script
-        run: |
-          python scripts/ast-translator/ast-creator.py --input "./content/${{ inputs.subdomain }}" --families "${{ inputs.families }}"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Commit and Push AST JSON Files
+      - name: Install AST Creator dependencies
+        run: pip install mistune python-frontmatter beautifulsoup4 pyyaml
+
+      - name: Run AST Creator Script (one family at a time)
+        shell: bash
         run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-          # Try up to 5 times to commit and push JSON files to handle merge conflicts gracefully.
-          for i in {1..5}; do
-              git add ./ast/**/*.json
-              git commit -m "AST Creator: Updated JSON files for subdomain ${{ inputs.subdomain }}" && break || (echo "Commit attempt $i failed, retrying..."; sleep 5)
+          set -euo pipefail
+          IFS=',' read -ra FAMS <<< "${{ inputs.families }}"
+          for fam in "${FAMS[@]}"; do
+            fam="$(echo -n "$fam" | xargs)"
+            [ -z "$fam" ] && continue
+            src="content/${{ inputs.subdomain }}/${fam}"
+            if [ ! -d "$src/en" ]; then
+              echo "::error::No English source folder: $src/en"
+              exit 1
+            fi
+            echo "== AST for ${{ inputs.subdomain }}/${fam}"
+            python scripts/ast-translator/ast-creator.py --input "$src"
+            count=$(find "ast/${{ inputs.subdomain }}/${fam}/en" -name '*.json' | wc -l)
+            echo "AST files for ${fam}: ${count}"
+            if [ "$count" -eq 0 ]; then
+              echo "::error::AST creator produced no files for ${fam}"
+              exit 1
+            fi
           done
-          git push origin HEAD
 
       - name: Upload AST Files as Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ast-files
           path: ./ast
