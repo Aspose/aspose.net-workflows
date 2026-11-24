@@ -11,6 +11,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Refuse to run (www.aspose.net is intentionally not deployed from this repo)
+        run: |
+          echo "::error title=www.aspose.net is not deployed from this repo::www.aspose.net is intentionally not deployed from this repo (WS7b, TC-SYS-159). This workflow is disabled by design; do not re-enable or dispatch it."
+          exit 1
       - name: Checkout theme repo
         uses: actions/checkout@main
         with:

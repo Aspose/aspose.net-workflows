@@ -71,7 +71,7 @@ Below is a list of all workflow files located in `.github/workflows/`, each link
 | [reference.aspose.net-zip.yml](../../actions/workflows/reference.aspose.net-zip.yml) | Builds and deploys ZIP API reference for reference.aspose.net |
 | [reference.aspose.net.yml](../../actions/workflows/reference.aspose.net.yml) | Builds and deploys the main reference.aspose.net site as a whole |
 | [websites.aspose.net.yml](../../actions/workflows/websites.aspose.net.yml) | Builds and deploys the websites.aspose.net site as a whole |
-| [www.aspose.net.yml](../../actions/workflows/www.aspose.net.yml) | Builds and deploys the www.aspose.net site as a whole |
+| [www.aspose.net.yml](../../actions/workflows/www.aspose.net.yml) | **DISABLED BY DESIGN.** www.aspose.net is intentionally never deployed from this repo; the workflow hard-fails and is excluded from change-scanner, deploy-pipeline and all.yml (WS7b, TC-SYS-159) |
 
 ## Utility Actions
 

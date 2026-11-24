@@ -48,13 +48,23 @@ FAMILY_SECTIONS = {
 
 WHOLE_SECTIONS = [
     "blog.aspose.net",
-    "www.aspose.net",
     "about.aspose.net",
     "websites.aspose.net",
 ]
 
+# Workflows that must NEVER be selected for deployment from this repo
+# (WS7b, TC-SYS-159). www.aspose.net is intentionally not deployed from here.
+# This is applied in get_all_deploy_workflows() and again on the final list in
+# main(), so no path (initial run, global change, per-file mapping) can return it.
+EXCLUDED_WORKFLOWS = frozenset({"www.aspose.net.yml"})
+
 # Paths outside content/ that affect all sites (theme, layout, static assets)
 GLOBAL_PATHS = ["themes/", "layouts/", "archetypes/", "static/", "i18n/"]
+
+
+def drop_excluded(workflows):
+    """Return the workflows with every EXCLUDED_WORKFLOWS entry removed."""
+    return {wf for wf in workflows if wf not in EXCLUDED_WORKFLOWS}
 
 
 def get_all_deploy_workflows():
@@ -65,7 +75,7 @@ def get_all_deploy_workflows():
             workflows.add(f"{section}-{family}.yml")
     for section in WHOLE_SECTIONS:
         workflows.add(f"{section}.yml")
-    return workflows
+    return drop_excluded(workflows)
 
 
 def map_path_to_workflow(path):
@@ -251,7 +261,8 @@ def main():
 
         workflows = add_home_workflows(workflows)
 
-    workflow_list = sorted(workflows)
+    # Final guard: never emit an excluded workflow, whatever path selected it.
+    workflow_list = sorted(drop_excluded(workflows))
 
     print(f"\nWorkflows to trigger ({len(workflow_list)}):")
     for wf in workflow_list:

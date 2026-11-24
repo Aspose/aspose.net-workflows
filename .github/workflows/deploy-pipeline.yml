@@ -35,6 +35,12 @@ jobs:
           readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
           ACTIVE_WFS=()
           for wf in "${WF_ARRAY[@]}"; do
+            # www.aspose.net is intentionally never deployed from this repo (WS7b, TC-SYS-159).
+            # Skip it here (not via job-level skip) so the poller never waits for it.
+            if [ "$wf" = "www.aspose.net.yml" ]; then
+              echo "  -> EXCLUDED $wf (www.aspose.net is intentionally not deployed from this repo)"
+              continue
+            fi
             STATE=$(gh api "repos/${GH_REPO}/actions/workflows/${wf}" --jq '.state' 2>/dev/null || echo "unknown")
             if [ "$STATE" != "active" ]; then
               echo "  -> SKIPPED $wf (state: $STATE)"
@@ -132,6 +138,12 @@ jobs:
           readarray -t WF_ARRAY < <(echo "$WORKFLOWS" | jq -r '.[]')
           ACTIVE_WFS=()
           for wf in "${WF_ARRAY[@]}"; do
+            # www.aspose.net is intentionally never deployed from this repo (WS7b, TC-SYS-159).
+            # Skip it here (not via job-level skip) so the poller never waits for it.
+            if [ "$wf" = "www.aspose.net.yml" ]; then
+              echo "  -> EXCLUDED $wf (www.aspose.net is intentionally not deployed from this repo)"
+              continue
+            fi
             STATE=$(gh api "repos/${GH_REPO}/actions/workflows/${wf}" --jq '.state' 2>/dev/null || echo "unknown")
             if [ "$STATE" != "active" ]; then
               echo "  -> SKIPPED $wf (state: $STATE)"
