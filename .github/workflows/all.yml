@@ -21,8 +21,9 @@ jobs:
 
       - name: Get sibling workflows
         run: |
-          # Exclude the main workflow file (all.yml) and any file containing a dash in its name
-          workflows=$(find .github/workflows -type f -name '*.yml' ! -name 'all.yml' ! -name '*-*')
+          # Exclude the main workflow file (all.yml), www.aspose.net.yml (intentionally never deployed
+          # from this repo, WS7b / TC-SYS-159) and any file containing a dash in its name
+          workflows=$(find .github/workflows -type f -name '*.yml' ! -name 'all.yml' ! -name 'www.aspose.net.yml' ! -name '*-*')
           echo "Filtered sibling workflows found:"
           echo "$workflows"
           echo "$workflows" > workflows.txt
